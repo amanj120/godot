@@ -685,11 +685,17 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 
     static Error store_in_gradle_project(const String &p_path, const Vector<uint8_t> &p_data, int compression_method = Z_DEFLATED) {
         //use dir_access.cpp and file_access.cpp to write the file
-        if(!DirAccess::exists("res://android/build/assets")){ //makes an asset directory
+        size_t dir_point = p_path.rfind("/");
+        String dir = p_path.substr(0, dir_point); //gets the directory of the file
+        if(!DirAccess::exists(dir)){ //makes an asset directory
 			DirAccess *filesystem_da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
-			filesystem_da -> make_dir_recursive("res://android/build/assets");
+			filesystem_da -> make_dir_recursive(dir);
 			memdelete(filesystem_da);
         }
+        FileAccess * fa = FileAccess::open(p_path, FileAccess::WRITE);
+        fa -> store_buffer(p_data.ptr(), p_data.size());
+        ERR_FAIL_COND_V_MSG(!fa, ERR_CANT_CREATE, "Cannot create file '" + p_path + "'.");
+        memdelete(fa);
         return OK;
     }
 
