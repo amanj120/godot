@@ -2393,21 +2393,21 @@ public:
         }
         */
 		//Executes the build command
-//		int result = EditorNode::get_singleton()->execute_and_show_output(TTR("Building Android Project (gradle)"), build_command, cmdline);
-//		if (result != 0) {
-//			EditorNode::get_singleton()->show_warning(TTR("Building of Android project failed, check output for the error.\nAlternatively visit docs.godotengine.org for Android build documentation."));
-//			return ERR_CANT_CREATE;
-//		}
-//		if (p_debug) {
-//			src_apk = build_path.plus_file("build/outputs/apk/debug/android_debug.apk");
-//		} else {
-//			src_apk = build_path.plus_file("build/outputs/apk/release/android_release.apk");
-//		}
-//
-//		if (!FileAccess::exists(src_apk)) {
-//			EditorNode::get_singleton()->show_warning(TTR("No build apk generated at: ") + "\n" + src_apk);
-//			return ERR_CANT_CREATE;
-//		}
+		int result = EditorNode::get_singleton()->execute_and_show_output(TTR("Building Android Project (gradle)"), build_command, cmdline);
+		if (result != 0) {
+			EditorNode::get_singleton()->show_warning(TTR("Building of Android project failed, check output for the error.\nAlternatively visit docs.godotengine.org for Android build documentation."));
+			return ERR_CANT_CREATE;
+		}
+		if (p_debug) {
+			src_apk = build_path.plus_file("build/outputs/apk/debug/android_debug.apk");
+		} else {
+			src_apk = build_path.plus_file("build/outputs/apk/release/android_release.apk");
+		}
+
+		if (!FileAccess::exists(src_apk)) {
+			EditorNode::get_singleton()->show_warning(TTR("No build apk generated at: ") + "\n" + src_apk);
+			return ERR_CANT_CREATE;
+		}
 //
 //
 		return OK;
