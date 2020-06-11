@@ -683,6 +683,16 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return enabled_plugins;
 	}
 
+    static Error store_in_gradle_project(const String &p_path, const Vector<uint8_t> &p_data, int compression_method = Z_DEFLATED) {
+        //use dir_access.cpp and file_access.cpp to write the file
+        if(!DirAccess::exists("res://android/build/assets")){ //makes an asset directory
+			DirAccess *filesystem_da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
+			filesystem_da -> make_dir_recursive("res://android/build/assets");
+			memdelete(filesystem_da);
+        }
+        return OK;
+    }
+
 	static Error store_in_apk(APKExportData *ed, const String &p_path, const Vector<uint8_t> &p_data, int compression_method = Z_DEFLATED) {
 		zip_fileinfo zipfi = get_zip_fileinfo();
 		zipOpenNewFileInZip(ed->apk,
@@ -701,6 +711,36 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 
 		return OK;
 	}
+
+    static Error save_gradle_project_so(void *p_userdata, const SharedObject &p_so) {
+        if (!p_so.path.get_file().begins_with("lib")) {
+            String err = "Android .so file names must start with \"lib\", but got: " + p_so.path;
+            ERR_PRINTS(err);
+            return FAILED;
+        }
+        APKExportData *ed = (APKExportData *)p_userdata;
+        Vector<String> abis = get_abis();
+        bool exported = false;
+        for (int i = 0; i < p_so.tags.size(); ++i) {
+            // shared objects can be fat (compatible with multiple ABIs)
+            int abi_index = abis.find(p_so.tags[i]);
+            if (abi_index != -1) {
+                exported = true;
+                String abi = abis[abi_index];
+                String dst_path = String("lib").plus_file(abi).plus_file(p_so.path.get_file());
+                Vector<uint8_t> array = FileAccess::get_file_as_array(p_so.path);
+                Error store_err = store_in_gradle_project(dst_path, array);
+                ERR_FAIL_COND_V_MSG(store_err, store_err, "Cannot store in apk file '" + dst_path + "'.");
+            }
+        }
+        if (!exported) {
+            String abis_string = String(" ").join(abis);
+            String err = "Cannot determine ABI for library \"" + p_so.path + "\". One of the supported ABIs must be used as a tag: " + abis_string;
+            ERR_PRINTS(err);
+            return FAILED;
+        }
+        return OK;
+    }
 
 	static Error save_apk_so(void *p_userdata, const SharedObject &p_so) {
 		if (!p_so.path.get_file().begins_with("lib")) {
@@ -732,9 +772,11 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
+
+
 	static Error save_gradle_project_file(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total){
-		String dst_path = p_path.replace_first("res://", "assets/");
-		// put logic to save a file in a directory
+		String dst_path = p_path.replace_first("res://", "res://android/build/assets/");
+		store_in_gradle_project(dst_path, p_data, 0);
 		return OK;
 	}
 
@@ -2302,7 +2344,7 @@ public:
         APKExportData ed;
         //have to change save_gradle_project_file and save_apk_so to put .so files and
         //all the assets in the right place inside the gradle project
-        Error err = export_project_files(p_preset, save_gradle_project_file, &ed, save_apk_so); //not quite sure what happens here
+        Error err = export_project_files(p_preset, save_gradle_project_file, &ed, save_gradle_project_so); //not quite sure what happens here
 
 		OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
 
