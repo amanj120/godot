@@ -732,6 +732,12 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
+	static Error save_gradle_project_file(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total){
+		String dst_path = p_path.replace_first("res://", "assets/");
+		// put logic to save a file in a directory
+		return OK;
+	}
+
 	static Error save_apk_file(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total) {
 		APKExportData *ed = (APKExportData *)p_userdata;
 		String dst_path = p_path.replace_first("res://", "assets/");
@@ -2274,7 +2280,6 @@ public:
 		return have_plugins_changed || first_build;
 	}
 
-
 	Error gradle_build(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, String &src_apk, int p_flags = 0){
 
 		{ //test that installed build version is alright
@@ -2291,14 +2296,18 @@ public:
 		}
 		//build project if custom build is enabled
 		String sdk_path = EDITOR_GET("export/android/custom_build_sdk_path");
-
 		ERR_FAIL_COND_V_MSG(sdk_path == "", ERR_UNCONFIGURED, "Android SDK path must be configured in Editor Settings at 'export/android/custom_build_sdk_path'.");
 
-		_update_custom_build_project();
+		_update_custom_build_project(); //alters the build.gradle, android manifest, etc.
+        APKExportData ed;
+        //have to change save_gradle_project_file and save_apk_so to put .so files and
+        //all the assets in the right place inside the gradle project
+        Error err = export_project_files(p_preset, save_gradle_project_file, &ed, save_apk_so); //not quite sure what happens here
 
 		OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
 
 		String build_command;
+
 #ifdef WINDOWS_ENABLED
 		build_command = "gradlew.bat";
 #else
@@ -2335,22 +2344,24 @@ public:
             print_line("exit code: " + itos(ec));
         }
         */
-		int result = EditorNode::get_singleton()->execute_and_show_output(TTR("Building Android Project (gradle)"), build_command, cmdline);
-		if (result != 0) {
-			EditorNode::get_singleton()->show_warning(TTR("Building of Android project failed, check output for the error.\nAlternatively visit docs.godotengine.org for Android build documentation."));
-			return ERR_CANT_CREATE;
-		}
-		if (p_debug) {
-			src_apk = build_path.plus_file("build/outputs/apk/debug/android_debug.apk");
-		} else {
-			src_apk = build_path.plus_file("build/outputs/apk/release/android_release.apk");
-		}
-
-		if (!FileAccess::exists(src_apk)) {
-			EditorNode::get_singleton()->show_warning(TTR("No build apk generated at: ") + "\n" + src_apk);
-			return ERR_CANT_CREATE;
-		}
-
+		//Executes the build command
+//		int result = EditorNode::get_singleton()->execute_and_show_output(TTR("Building Android Project (gradle)"), build_command, cmdline);
+//		if (result != 0) {
+//			EditorNode::get_singleton()->show_warning(TTR("Building of Android project failed, check output for the error.\nAlternatively visit docs.godotengine.org for Android build documentation."));
+//			return ERR_CANT_CREATE;
+//		}
+//		if (p_debug) {
+//			src_apk = build_path.plus_file("build/outputs/apk/debug/android_debug.apk");
+//		} else {
+//			src_apk = build_path.plus_file("build/outputs/apk/release/android_release.apk");
+//		}
+//
+//		if (!FileAccess::exists(src_apk)) {
+//			EditorNode::get_singleton()->show_warning(TTR("No build apk generated at: ") + "\n" + src_apk);
+//			return ERR_CANT_CREATE;
+//		}
+//
+//
 		return OK;
 	}
 
