@@ -2362,34 +2362,28 @@ public:
 
 		EditorProgress ep("export", "Exporting for Android", 105, true);
 
-//		if (bool(p_preset->get("custom_template/use_custom_build"))) { //custom build
-//			//re-generate build.gradle and AndroidManifest.xml
-//			Error err = gradle_build(p_preset, p_debug, p_path, src_apk, p_flags);
-//			if(err != OK){
-//				return err;
-//			}
-//
-//		}
-//		else {
+		if (bool(p_preset->get("custom_template/use_custom_build"))) { //custom build
+			return gradle_build(p_preset, p_debug, p_path, src_apk, p_flags);
+		}
 
-			if (p_debug)
-				src_apk = p_preset->get("custom_template/debug");
-			else
-				src_apk = p_preset->get("custom_template/release");
+        if (p_debug)
+            src_apk = p_preset->get("custom_template/debug");
+        else
+            src_apk = p_preset->get("custom_template/release");
 
-			src_apk = src_apk.strip_edges();
-			if (src_apk == "") {
-				if (p_debug) {
-					src_apk = find_export_template("android_debug.apk");
-				} else {
-					src_apk = find_export_template("android_release.apk");
-				}
-				if (src_apk == "") {
-					EditorNode::add_io_error("Package not found: " + src_apk);
-					return ERR_FILE_NOT_FOUND;
-				}
-			}
-//		}
+        src_apk = src_apk.strip_edges();
+        if (src_apk == "") {
+            if (p_debug) {
+                src_apk = find_export_template("android_debug.apk");
+            } else {
+                src_apk = find_export_template("android_release.apk");
+            }
+            if (src_apk == "") {
+                EditorNode::add_io_error("Package not found: " + src_apk);
+                return ERR_FILE_NOT_FOUND;
+            }
+        }
+
 
 		if (!DirAccess::exists(p_path.get_base_dir())) {
 			return ERR_FILE_BAD_PATH;
