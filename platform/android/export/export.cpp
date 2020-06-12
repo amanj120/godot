@@ -683,21 +683,21 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return enabled_plugins;
 	}
 
-    static Error store_in_gradle_project(const String &p_path, const Vector<uint8_t> &p_data, int compression_method = Z_DEFLATED) {
-        //use dir_access.cpp and file_access.cpp to write the file
-        size_t dir_point = p_path.rfind("/");
-        String dir = p_path.substr(0, dir_point); //gets the directory of the file
-        if(!DirAccess::exists(dir)){ //makes an asset directory
+	static Error store_in_gradle_project(const String &p_path, const Vector<uint8_t> &p_data, int compression_method = Z_DEFLATED) {
+		//use dir_access.cpp and file_access.cpp to write the file
+		size_t dir_point = p_path.rfind("/");
+		String dir = p_path.substr(0, dir_point); //gets the directory of the file
+		if (!DirAccess::exists(dir)) { //makes an asset directory
 			DirAccess *filesystem_da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
-			filesystem_da -> make_dir_recursive(dir);
+			filesystem_da->make_dir_recursive(dir);
 			memdelete(filesystem_da);
-        }
-        FileAccess * fa = FileAccess::open(p_path, FileAccess::WRITE);
-        fa -> store_buffer(p_data.ptr(), p_data.size());
-        ERR_FAIL_COND_V_MSG(!fa, ERR_CANT_CREATE, "Cannot create file '" + p_path + "'.");
-        memdelete(fa);
-        return OK;
-    }
+		}
+		FileAccess *fa = FileAccess::open(p_path, FileAccess::WRITE);
+		fa->store_buffer(p_data.ptr(), p_data.size());
+		ERR_FAIL_COND_V_MSG(!fa, ERR_CANT_CREATE, "Cannot create file '" + p_path + "'.");
+		memdelete(fa);
+		return OK;
+	}
 
 	static Error store_in_apk(APKExportData *ed, const String &p_path, const Vector<uint8_t> &p_data, int compression_method = Z_DEFLATED) {
 		zip_fileinfo zipfi = get_zip_fileinfo();
@@ -718,34 +718,34 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
-    static Error save_gradle_project_so(void *p_userdata, const SharedObject &p_so) {
-        if (!p_so.path.get_file().begins_with("lib")) {
-            String err = "Android .so file names must start with \"lib\", but got: " + p_so.path;
-            ERR_PRINTS(err);
-            return FAILED;
-        }
-        Vector<String> abis = get_abis();
-        bool exported = false;
-        for (int i = 0; i < p_so.tags.size(); ++i) {
-            // shared objects can be fat (compatible with multiple ABIs)
-            int abi_index = abis.find(p_so.tags[i]);
-            if (abi_index != -1) {
-                exported = true;
-                String abi = abis[abi_index];
-                String dst_path = String("lib").plus_file(abi).plus_file(p_so.path.get_file());
-                Vector<uint8_t> array = FileAccess::get_file_as_array(p_so.path);
-                Error store_err = store_in_gradle_project(dst_path, array);
-                ERR_FAIL_COND_V_MSG(store_err, store_err, "Cannot store in apk file '" + dst_path + "'.");
-            }
-        }
-        if (!exported) {
-            String abis_string = String(" ").join(abis);
-            String err = "Cannot determine ABI for library \"" + p_so.path + "\". One of the supported ABIs must be used as a tag: " + abis_string;
-            ERR_PRINTS(err);
-            return FAILED;
-        }
-        return OK;
-    }
+	static Error save_gradle_project_so(void *p_userdata, const SharedObject &p_so) {
+		if (!p_so.path.get_file().begins_with("lib")) {
+			String err = "Android .so file names must start with \"lib\", but got: " + p_so.path;
+			ERR_PRINTS(err);
+			return FAILED;
+		}
+		Vector<String> abis = get_abis();
+		bool exported = false;
+		for (int i = 0; i < p_so.tags.size(); ++i) {
+			// shared objects can be fat (compatible with multiple ABIs)
+			int abi_index = abis.find(p_so.tags[i]);
+			if (abi_index != -1) {
+				exported = true;
+				String abi = abis[abi_index];
+				String dst_path = String("lib").plus_file(abi).plus_file(p_so.path.get_file());
+				Vector<uint8_t> array = FileAccess::get_file_as_array(p_so.path);
+				Error store_err = store_in_gradle_project(dst_path, array);
+				ERR_FAIL_COND_V_MSG(store_err, store_err, "Cannot store in apk file '" + dst_path + "'.");
+			}
+		}
+		if (!exported) {
+			String abis_string = String(" ").join(abis);
+			String err = "Cannot determine ABI for library \"" + p_so.path + "\". One of the supported ABIs must be used as a tag: " + abis_string;
+			ERR_PRINTS(err);
+			return FAILED;
+		}
+		return OK;
+	}
 
 	static Error save_apk_so(void *p_userdata, const SharedObject &p_so) {
 		if (!p_so.path.get_file().begins_with("lib")) {
@@ -777,7 +777,7 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
-	static Error save_gradle_project_file(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total){
+	static Error save_gradle_project_file(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total) {
 		String dst_path = p_path.replace_first("res://", "res://android/build/assets/");
 		store_in_gradle_project(dst_path, p_data, 0);
 		return OK;
@@ -1485,30 +1485,29 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		//printf("end\n");
 	}
 
-    Vector<uint8_t> resize_launcher_icon(const Ref<Image> &p_source_image, const LauncherIcon p_icon){
-        Ref<Image> working_image = p_source_image;
+	Vector<uint8_t> resize_launcher_icon(const Ref<Image> &p_source_image, const LauncherIcon p_icon) {
+		Ref<Image> working_image = p_source_image;
 
-        if (p_source_image->get_width() != p_icon.dimensions || p_source_image->get_height() != p_icon.dimensions) {
-            working_image = p_source_image->duplicate();
-            working_image->resize(p_icon.dimensions, p_icon.dimensions, Image::Interpolation::INTERPOLATE_LANCZOS);
-        }
+		if (p_source_image->get_width() != p_icon.dimensions || p_source_image->get_height() != p_icon.dimensions) {
+			working_image = p_source_image->duplicate();
+			working_image->resize(p_icon.dimensions, p_icon.dimensions, Image::Interpolation::INTERPOLATE_LANCZOS);
+		}
 
-        PoolVector<uint8_t> png_buffer;
-        Error err = PNGDriverCommon::image_to_png(working_image, png_buffer);
-        if (err == OK) {
-            Vector<uint8_t> ret;
-            ret.resize(png_buffer.size());
-            memcpy(ret.ptrw(), png_buffer.read().ptr(), ret.size());
-            return ret;
-        } else {
-            String err_str = String("Failed to convert resized icon (") + p_icon.export_path + ") to png.";
-            WARN_PRINT(err_str.utf8().get_data());
-            return Vector<uint8_t>();
-        }
+		PoolVector<uint8_t> png_buffer;
+		Error err = PNGDriverCommon::image_to_png(working_image, png_buffer);
+		if (err == OK) {
+			Vector<uint8_t> ret;
+			ret.resize(png_buffer.size());
+			memcpy(ret.ptrw(), png_buffer.read().ptr(), ret.size());
+			return ret;
+		} else {
+			String err_str = String("Failed to convert resized icon (") + p_icon.export_path + ") to png.";
+			WARN_PRINT(err_str.utf8().get_data());
+			return Vector<uint8_t>();
+		}
 	}
 
-
-    void _process_launcher_icons(const String &p_processing_file_name, const Ref<Image> &p_source_image, const LauncherIcon p_icon, Vector<uint8_t> &p_data) {
+	void _process_launcher_icons(const String &p_processing_file_name, const Ref<Image> &p_source_image, const LauncherIcon p_icon, Vector<uint8_t> &p_data) {
 		if (p_processing_file_name == p_icon.export_path) {
 			Ref<Image> working_image = p_source_image;
 
@@ -2348,7 +2347,7 @@ public:
 		return have_plugins_changed || first_build;
 	}
 
-	Error gradle_build(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, String &src_apk, int p_flags = 0){
+	Error gradle_build(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, String &src_apk, int p_flags = 0) {
 
 		{ //test that installed build version is alright
 			FileAccessRef f = FileAccess::open("res://android/.build_version", FileAccess::READ);
@@ -2368,152 +2367,149 @@ public:
 
 		_update_custom_build_project(); //alters the build.gradle, android manifest, etc.
 
+		String project_icon_path = ProjectSettings::get_singleton()->get("application/config/icon");
 
+		// Prepare images to be resized for the icons. If some image ends up being uninitialized, the default image from the export template will be used.
+		Ref<Image> launcher_icon_image;
+		Ref<Image> launcher_adaptive_icon_foreground_image;
+		Ref<Image> launcher_adaptive_icon_background_image;
 
-        String project_icon_path = ProjectSettings::get_singleton()->get("application/config/icon");
+		launcher_icon_image.instance();
+		launcher_adaptive_icon_foreground_image.instance();
+		launcher_adaptive_icon_background_image.instance();
 
-        // Prepare images to be resized for the icons. If some image ends up being uninitialized, the default image from the export template will be used.
-        Ref<Image> launcher_icon_image;
-        Ref<Image> launcher_adaptive_icon_foreground_image;
-        Ref<Image> launcher_adaptive_icon_background_image;
+		// Regular icon: user selection -> project icon -> default.
+		String path = static_cast<String>(p_preset->get(launcher_icon_option)).strip_edges();
+		if (path.empty() || ImageLoader::load_image(path, launcher_icon_image) != OK) {
+			ImageLoader::load_image(project_icon_path, launcher_icon_image);
+		}
 
-        launcher_icon_image.instance();
-        launcher_adaptive_icon_foreground_image.instance();
-        launcher_adaptive_icon_background_image.instance();
+		// Adaptive foreground: user selection -> regular icon (user selection -> project icon -> default).
+		path = static_cast<String>(p_preset->get(launcher_adaptive_icon_foreground_option)).strip_edges();
+		if (path.empty() || ImageLoader::load_image(path, launcher_adaptive_icon_foreground_image) != OK) {
+			launcher_adaptive_icon_foreground_image = launcher_icon_image;
+		}
 
-        // Regular icon: user selection -> project icon -> default.
-        String path = static_cast<String>(p_preset->get(launcher_icon_option)).strip_edges();
-        if (path.empty() || ImageLoader::load_image(path, launcher_icon_image) != OK) {
-            ImageLoader::load_image(project_icon_path, launcher_icon_image);
-        }
+		// Adaptive background: user selection -> default.
+		path = static_cast<String>(p_preset->get(launcher_adaptive_icon_background_option)).strip_edges();
+		if (!path.empty()) {
+			ImageLoader::load_image(path, launcher_adaptive_icon_background_image);
+		}
 
-        // Adaptive foreground: user selection -> regular icon (user selection -> project icon -> default).
-        path = static_cast<String>(p_preset->get(launcher_adaptive_icon_foreground_option)).strip_edges();
-        if (path.empty() || ImageLoader::load_image(path, launcher_adaptive_icon_foreground_image) != OK) {
-            launcher_adaptive_icon_foreground_image = launcher_icon_image;
-        }
+		//        String file = "res://android/build/AndroidManifest.xml";
+		//
+		//        Vector<uint8_t> android_manifest_file_data = FileAccess::get_file_as_array(file);
+		//        _fix_manifest(p_preset, android_manifest_file_data,  p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
 
-        // Adaptive background: user selection -> default.
-        path = static_cast<String>(p_preset->get(launcher_adaptive_icon_background_option)).strip_edges();
-        if (!path.empty()) {
-            ImageLoader::load_image(path, launcher_adaptive_icon_background_image);
-        }
-
-//        String file = "res://android/build/AndroidManifest.xml";
-//
-//        Vector<uint8_t> android_manifest_file_data = FileAccess::get_file_as_array(file);
-//        _fix_manifest(p_preset, android_manifest_file_data,  p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
-
-        for (int i = 0; i < icon_densities_count; ++i) {
-            //void _process_launcher_icons(const String &p_processing_file_name, const Ref<Image> &p_source_image, const LauncherIcon p_icon, Vector<uint8_t> &p_data)
-            if (launcher_icon_image.is_valid() && !launcher_icon_image->empty()) {
-                Vector<uint8_t> data = resize_launcher_icon(launcher_icon_image, launcher_icons[i]);
-                String img_path = launcher_icons[i].export_path;
-                img_path = img_path.insert(0, "res://android/build/");
-                store_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
-
-            }
-            if (launcher_adaptive_icon_foreground_image.is_valid() && !launcher_adaptive_icon_foreground_image->empty()) {
-                Vector<uint8_t> data = resize_launcher_icon(launcher_adaptive_icon_foreground_image, launcher_adaptive_icon_foregrounds[i]);
+		for (int i = 0; i < icon_densities_count; ++i) {
+			//void _process_launcher_icons(const String &p_processing_file_name, const Ref<Image> &p_source_image, const LauncherIcon p_icon, Vector<uint8_t> &p_data)
+			if (launcher_icon_image.is_valid() && !launcher_icon_image->empty()) {
+				Vector<uint8_t> data = resize_launcher_icon(launcher_icon_image, launcher_icons[i]);
+				String img_path = launcher_icons[i].export_path;
+				img_path = img_path.insert(0, "res://android/build/");
+				store_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
+			}
+			if (launcher_adaptive_icon_foreground_image.is_valid() && !launcher_adaptive_icon_foreground_image->empty()) {
+				Vector<uint8_t> data = resize_launcher_icon(launcher_adaptive_icon_foreground_image, launcher_adaptive_icon_foregrounds[i]);
 				String img_path = launcher_adaptive_icon_foregrounds[i].export_path;
-                img_path = img_path.insert(0, "res://android/build/");
-                store_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
-            }
-            if (launcher_adaptive_icon_background_image.is_valid() && !launcher_adaptive_icon_background_image->empty()) {
-                Vector<uint8_t> data = resize_launcher_icon(launcher_adaptive_icon_background_image, launcher_adaptive_icon_backgrounds[i]);
-                String img_path = launcher_adaptive_icon_backgrounds[i].export_path;
-                img_path = img_path.insert(0, "res://android/build/");
-                store_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
-            }
-        }
+				img_path = img_path.insert(0, "res://android/build/");
+				store_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
+			}
+			if (launcher_adaptive_icon_background_image.is_valid() && !launcher_adaptive_icon_background_image->empty()) {
+				Vector<uint8_t> data = resize_launcher_icon(launcher_adaptive_icon_background_image, launcher_adaptive_icon_backgrounds[i]);
+				String img_path = launcher_adaptive_icon_backgrounds[i].export_path;
+				img_path = img_path.insert(0, "res://android/build/");
+				store_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
+			}
+		}
 
-//        while (ret == UNZ_OK) {
-//
-//            //get filename
-//            unz_file_info info;
-//            char fname[16384];
-//            ret = unzGetCurrentFileInfo(pkg, &info, fname, 16384, NULL, 0, NULL, 0);
-//
-//            bool skip = false;
-//
-//            String file = fname;
-//
-//            Vector<uint8_t> data;
-//            data.resize(info.uncompressed_size);
-//
-//            //read
-//            unzOpenCurrentFile(pkg);
-//            unzReadCurrentFile(pkg, data.ptrw(), data.size());
-//            unzCloseCurrentFile(pkg);
-//
-//            //write
-//
-//            if (file == "AndroidManifest.xml") {
-//                _fix_manifest(p_preset, data, p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
-//            }
-//
-//            if (file == "resources.arsc") {
-//                _fix_resources(p_preset, data);
-//            }
-//
-//            for (int i = 0; i < icon_densities_count; ++i) {
-//                if (launcher_icon_image.is_valid() && !launcher_icon_image->empty()) {
-//                    _process_launcher_icons(file, launcher_icon_image, launcher_icons[i], data);
-//                }
-//                if (launcher_adaptive_icon_foreground_image.is_valid() && !launcher_adaptive_icon_foreground_image->empty()) {
-//                    _process_launcher_icons(file, launcher_adaptive_icon_foreground_image, launcher_adaptive_icon_foregrounds[i], data);
-//                }
-//                if (launcher_adaptive_icon_background_image.is_valid() && !launcher_adaptive_icon_background_image->empty()) {
-//                    _process_launcher_icons(file, launcher_adaptive_icon_background_image, launcher_adaptive_icon_backgrounds[i], data);
-//                }
-//            }
-//
-//            if (file.ends_with(".so")) {
-//                bool enabled = false;
-//                for (int i = 0; i < enabled_abis.size(); ++i) {
-//                    if (file.begins_with("lib/" + enabled_abis[i] + "/")) {
-//                        invalid_abis.erase(enabled_abis[i]);
-//                        enabled = true;
-//                        break;
-//                    }
-//                }
-//                if (!enabled) {
-//                    skip = true;
-//                }
-//            }
-//
-//            if (file.begins_with("META-INF") && _signed) {
-//                skip = true;
-//            }
-//
-//            if (!skip) {
-//                print_line("ADDING: " + file);
-//
-//                // Respect decision on compression made by AAPT for the export template
-//                const bool uncompressed = info.compression_method == 0;
-//
-//                zip_fileinfo zipfi = get_zip_fileinfo();
-//
-//                zipOpenNewFileInZip(unaligned_apk,
-//                                    file.utf8().get_data(),
-//                                    &zipfi,
-//                                    NULL,
-//                                    0,
-//                                    NULL,
-//                                    0,
-//                                    NULL,
-//                                    uncompressed ? 0 : Z_DEFLATED,
-//                                    Z_DEFAULT_COMPRESSION);
-//
-//                zipWriteInFileInZip(unaligned_apk, data.ptr(), data.size());
-//                zipCloseFileInZip(unaligned_apk);
-//            }
-//
-//            ret = unzGoToNextFile(pkg);
-//        }
+		//        while (ret == UNZ_OK) {
+		//
+		//            //get filename
+		//            unz_file_info info;
+		//            char fname[16384];
+		//            ret = unzGetCurrentFileInfo(pkg, &info, fname, 16384, NULL, 0, NULL, 0);
+		//
+		//            bool skip = false;
+		//
+		//            String file = fname;
+		//
+		//            Vector<uint8_t> data;
+		//            data.resize(info.uncompressed_size);
+		//
+		//            //read
+		//            unzOpenCurrentFile(pkg);
+		//            unzReadCurrentFile(pkg, data.ptrw(), data.size());
+		//            unzCloseCurrentFile(pkg);
+		//
+		//            //write
+		//
+		//            if (file == "AndroidManifest.xml") {
+		//                _fix_manifest(p_preset, data, p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
+		//            }
+		//
+		//            if (file == "resources.arsc") {
+		//                _fix_resources(p_preset, data);
+		//            }
+		//
+		//            for (int i = 0; i < icon_densities_count; ++i) {
+		//                if (launcher_icon_image.is_valid() && !launcher_icon_image->empty()) {
+		//                    _process_launcher_icons(file, launcher_icon_image, launcher_icons[i], data);
+		//                }
+		//                if (launcher_adaptive_icon_foreground_image.is_valid() && !launcher_adaptive_icon_foreground_image->empty()) {
+		//                    _process_launcher_icons(file, launcher_adaptive_icon_foreground_image, launcher_adaptive_icon_foregrounds[i], data);
+		//                }
+		//                if (launcher_adaptive_icon_background_image.is_valid() && !launcher_adaptive_icon_background_image->empty()) {
+		//                    _process_launcher_icons(file, launcher_adaptive_icon_background_image, launcher_adaptive_icon_backgrounds[i], data);
+		//                }
+		//            }
+		//
+		//            if (file.ends_with(".so")) {
+		//                bool enabled = false;
+		//                for (int i = 0; i < enabled_abis.size(); ++i) {
+		//                    if (file.begins_with("lib/" + enabled_abis[i] + "/")) {
+		//                        invalid_abis.erase(enabled_abis[i]);
+		//                        enabled = true;
+		//                        break;
+		//                    }
+		//                }
+		//                if (!enabled) {
+		//                    skip = true;
+		//                }
+		//            }
+		//
+		//            if (file.begins_with("META-INF") && _signed) {
+		//                skip = true;
+		//            }
+		//
+		//            if (!skip) {
+		//                print_line("ADDING: " + file);
+		//
+		//                // Respect decision on compression made by AAPT for the export template
+		//                const bool uncompressed = info.compression_method == 0;
+		//
+		//                zip_fileinfo zipfi = get_zip_fileinfo();
+		//
+		//                zipOpenNewFileInZip(unaligned_apk,
+		//                                    file.utf8().get_data(),
+		//                                    &zipfi,
+		//                                    NULL,
+		//                                    0,
+		//                                    NULL,
+		//                                    0,
+		//                                    NULL,
+		//                                    uncompressed ? 0 : Z_DEFLATED,
+		//                                    Z_DEFAULT_COMPRESSION);
+		//
+		//                zipWriteInFileInZip(unaligned_apk, data.ptr(), data.size());
+		//                zipCloseFileInZip(unaligned_apk);
+		//            }
+		//
+		//            ret = unzGoToNextFile(pkg);
+		//        }
 
-        APKExportData ed;
-        Error err = export_project_files(p_preset, save_gradle_project_file, &ed, save_gradle_project_so);
+		APKExportData ed;
+		Error err = export_project_files(p_preset, save_gradle_project_file, &ed, save_gradle_project_so);
 
 		OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
 
@@ -2586,24 +2582,23 @@ public:
 			return gradle_build(p_preset, p_debug, p_path, src_apk, p_flags);
 		}
 
-        if (p_debug)
-            src_apk = p_preset->get("custom_template/debug");
-        else
-            src_apk = p_preset->get("custom_template/release");
+		if (p_debug)
+			src_apk = p_preset->get("custom_template/debug");
+		else
+			src_apk = p_preset->get("custom_template/release");
 
-        src_apk = src_apk.strip_edges();
-        if (src_apk == "") {
-            if (p_debug) {
-                src_apk = find_export_template("android_debug.apk");
-            } else {
-                src_apk = find_export_template("android_release.apk");
-            }
-            if (src_apk == "") {
-                EditorNode::add_io_error("Package not found: " + src_apk);
-                return ERR_FILE_NOT_FOUND;
-            }
-        }
-
+		src_apk = src_apk.strip_edges();
+		if (src_apk == "") {
+			if (p_debug) {
+				src_apk = find_export_template("android_debug.apk");
+			} else {
+				src_apk = find_export_template("android_release.apk");
+			}
+			if (src_apk == "") {
+				EditorNode::add_io_error("Package not found: " + src_apk);
+				return ERR_FILE_NOT_FOUND;
+			}
+		}
 
 		if (!DirAccess::exists(p_path.get_base_dir())) {
 			return ERR_FILE_BAD_PATH;
