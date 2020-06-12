@@ -778,8 +778,6 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
-
-
 	static Error save_gradle_project_file(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total){
 		String dst_path = p_path.replace_first("res://", "res://android/build/assets/");
 		store_in_gradle_project(dst_path, p_data, 0);
@@ -2408,8 +2406,7 @@ public:
 			EditorNode::get_singleton()->show_warning(TTR("No build apk generated at: ") + "\n" + src_apk);
 			return ERR_CANT_CREATE;
 		}
-//
-//
+
 		return OK;
 	}
 

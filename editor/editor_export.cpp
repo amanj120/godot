@@ -209,7 +209,6 @@ void EditorExportPreset::set_patch(int p_index, const String &p_path) {
 	patches.write[p_index] = p_path;
 	EditorExport::singleton->save_presets();
 }
-
 String EditorExportPreset::get_patch(int p_index) {
 
 	ERR_FAIL_INDEX_V(p_index, patches.size(), String());
@@ -510,7 +509,7 @@ void EditorExportPlatform::_edit_filter_list(Set<String> &r_list, const String &
 
 	DirAccess *da = DirAccess::open("res://");
 	ERR_FAIL_NULL(da);
-	_edit_files_with_filter(da, filters, r_list, exclude); //some renaming, that's all
+	_edit_files_with_filter(da, filters, r_list, exclude);
 	memdelete(da);
 }
 
@@ -700,11 +699,9 @@ Error EditorExportPlatform::export_project_files(const Ref<EditorExportPreset> &
 	Set<String> paths;
 	Vector<String> path_remaps;
 
-	//RESOURCES TAB
 	if (p_preset->get_export_filter() == EditorExportPreset::EXPORT_ALL_RESOURCES) {
-		//puts into 'paths' the path of every resource in res:// (or whatever it is the get_filesystem() returns)
-		EditorFileSystemDirectory *efsd = EditorFileSystem::get_singleton()->get_filesystem();
-		_export_find_resources(efsd, paths);
+		//find stuff
+		_export_find_resources(EditorFileSystem::get_singleton()->get_filesystem(), paths);
 	} else {
 		bool scenes_only = p_preset->get_export_filter() == EditorExportPreset::EXPORT_SELECTED_SCENES;
 
@@ -724,7 +721,6 @@ Error EditorExportPlatform::export_project_files(const Ref<EditorExportPreset> &
 	_edit_filter_list(paths, p_preset->get_include_filter(), false);
 	_edit_filter_list(paths, p_preset->get_exclude_filter(), true);
 
-    //PATCHES TAB
 	Vector<Ref<EditorExportPlugin> > export_plugins = EditorExport::get_singleton()->get_export_plugins();
 	for (int i = 0; i < export_plugins.size(); i++) {
 
@@ -742,7 +738,6 @@ Error EditorExportPlatform::export_project_files(const Ref<EditorExportPreset> &
 		export_plugins.write[i]->_clear();
 	}
 
-	//FEATURES TAB
 	FeatureContainers feature_containers = get_feature_containers(p_preset);
 	Set<String> &features = feature_containers.features;
 	PoolVector<String> &features_pv = feature_containers.features_pv;
@@ -752,7 +747,7 @@ Error EditorExportPlatform::export_project_files(const Ref<EditorExportPreset> &
 	int total = paths.size();
 
 	for (Set<String>::Element *E = paths.front(); E; E = E->next()) {
-        //iterate through every file that we want to include in the apk
+
 		String path = E->get();
 		String type = ResourceLoader::get_resource_type(path);
 
