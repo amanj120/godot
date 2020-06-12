@@ -724,7 +724,6 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
             ERR_PRINTS(err);
             return FAILED;
         }
-        APKExportData *ed = (APKExportData *)p_userdata;
         Vector<String> abis = get_abis();
         bool exported = false;
         for (int i = 0; i < p_so.tags.size(); ++i) {
@@ -1486,7 +1485,30 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		//printf("end\n");
 	}
 
-	void _process_launcher_icons(const String &p_processing_file_name, const Ref<Image> &p_source_image, const LauncherIcon p_icon, Vector<uint8_t> &p_data) {
+    Vector<uint8_t> resize_launcher_icon(const Ref<Image> &p_source_image, const LauncherIcon p_icon){
+        Ref<Image> working_image = p_source_image;
+
+        if (p_source_image->get_width() != p_icon.dimensions || p_source_image->get_height() != p_icon.dimensions) {
+            working_image = p_source_image->duplicate();
+            working_image->resize(p_icon.dimensions, p_icon.dimensions, Image::Interpolation::INTERPOLATE_LANCZOS);
+        }
+
+        PoolVector<uint8_t> png_buffer;
+        Error err = PNGDriverCommon::image_to_png(working_image, png_buffer);
+        if (err == OK) {
+            Vector<uint8_t> ret;
+            ret.resize(png_buffer.size());
+            memcpy(ret.ptrw(), png_buffer.read().ptr(), ret.size());
+            return ret;
+        } else {
+            String err_str = String("Failed to convert resized icon (") + p_icon.export_path + ") to png.";
+            WARN_PRINT(err_str.utf8().get_data());
+            return Vector<uint8_t>();
+        }
+	}
+
+
+    void _process_launcher_icons(const String &p_processing_file_name, const Ref<Image> &p_source_image, const LauncherIcon p_icon, Vector<uint8_t> &p_data) {
 		if (p_processing_file_name == p_icon.export_path) {
 			Ref<Image> working_image = p_source_image;
 
@@ -2345,14 +2367,158 @@ public:
 		ERR_FAIL_COND_V_MSG(sdk_path == "", ERR_UNCONFIGURED, "Android SDK path must be configured in Editor Settings at 'export/android/custom_build_sdk_path'.");
 
 		_update_custom_build_project(); //alters the build.gradle, android manifest, etc.
+
+
+
+        String project_icon_path = ProjectSettings::get_singleton()->get("application/config/icon");
+
+        // Prepare images to be resized for the icons. If some image ends up being uninitialized, the default image from the export template will be used.
+        Ref<Image> launcher_icon_image;
+        Ref<Image> launcher_adaptive_icon_foreground_image;
+        Ref<Image> launcher_adaptive_icon_background_image;
+
+        launcher_icon_image.instance();
+        launcher_adaptive_icon_foreground_image.instance();
+        launcher_adaptive_icon_background_image.instance();
+
+        // Regular icon: user selection -> project icon -> default.
+        String path = static_cast<String>(p_preset->get(launcher_icon_option)).strip_edges();
+        if (path.empty() || ImageLoader::load_image(path, launcher_icon_image) != OK) {
+            ImageLoader::load_image(project_icon_path, launcher_icon_image);
+        }
+
+        // Adaptive foreground: user selection -> regular icon (user selection -> project icon -> default).
+        path = static_cast<String>(p_preset->get(launcher_adaptive_icon_foreground_option)).strip_edges();
+        if (path.empty() || ImageLoader::load_image(path, launcher_adaptive_icon_foreground_image) != OK) {
+            launcher_adaptive_icon_foreground_image = launcher_icon_image;
+        }
+
+        // Adaptive background: user selection -> default.
+        path = static_cast<String>(p_preset->get(launcher_adaptive_icon_background_option)).strip_edges();
+        if (!path.empty()) {
+            ImageLoader::load_image(path, launcher_adaptive_icon_background_image);
+        }
+
+//        String file = "res://android/build/AndroidManifest.xml";
+//
+//        Vector<uint8_t> android_manifest_file_data = FileAccess::get_file_as_array(file);
+//        _fix_manifest(p_preset, android_manifest_file_data,  p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
+
+        for (int i = 0; i < icon_densities_count; ++i) {
+            //void _process_launcher_icons(const String &p_processing_file_name, const Ref<Image> &p_source_image, const LauncherIcon p_icon, Vector<uint8_t> &p_data)
+            if (launcher_icon_image.is_valid() && !launcher_icon_image->empty()) {
+                Vector<uint8_t> data = resize_launcher_icon(launcher_icon_image, launcher_icons[i]);
+                String img_path = launcher_icons[i].export_path;
+                img_path = img_path.insert(0, "res://android/build/");
+                store_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
+
+            }
+            if (launcher_adaptive_icon_foreground_image.is_valid() && !launcher_adaptive_icon_foreground_image->empty()) {
+                Vector<uint8_t> data = resize_launcher_icon(launcher_adaptive_icon_foreground_image, launcher_adaptive_icon_foregrounds[i]);
+				String img_path = launcher_adaptive_icon_foregrounds[i].export_path;
+                img_path = img_path.insert(0, "res://android/build/");
+                store_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
+            }
+            if (launcher_adaptive_icon_background_image.is_valid() && !launcher_adaptive_icon_background_image->empty()) {
+                Vector<uint8_t> data = resize_launcher_icon(launcher_adaptive_icon_background_image, launcher_adaptive_icon_backgrounds[i]);
+                String img_path = launcher_adaptive_icon_backgrounds[i].export_path;
+                img_path = img_path.insert(0, "res://android/build/");
+                store_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
+            }
+        }
+
+//        while (ret == UNZ_OK) {
+//
+//            //get filename
+//            unz_file_info info;
+//            char fname[16384];
+//            ret = unzGetCurrentFileInfo(pkg, &info, fname, 16384, NULL, 0, NULL, 0);
+//
+//            bool skip = false;
+//
+//            String file = fname;
+//
+//            Vector<uint8_t> data;
+//            data.resize(info.uncompressed_size);
+//
+//            //read
+//            unzOpenCurrentFile(pkg);
+//            unzReadCurrentFile(pkg, data.ptrw(), data.size());
+//            unzCloseCurrentFile(pkg);
+//
+//            //write
+//
+//            if (file == "AndroidManifest.xml") {
+//                _fix_manifest(p_preset, data, p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
+//            }
+//
+//            if (file == "resources.arsc") {
+//                _fix_resources(p_preset, data);
+//            }
+//
+//            for (int i = 0; i < icon_densities_count; ++i) {
+//                if (launcher_icon_image.is_valid() && !launcher_icon_image->empty()) {
+//                    _process_launcher_icons(file, launcher_icon_image, launcher_icons[i], data);
+//                }
+//                if (launcher_adaptive_icon_foreground_image.is_valid() && !launcher_adaptive_icon_foreground_image->empty()) {
+//                    _process_launcher_icons(file, launcher_adaptive_icon_foreground_image, launcher_adaptive_icon_foregrounds[i], data);
+//                }
+//                if (launcher_adaptive_icon_background_image.is_valid() && !launcher_adaptive_icon_background_image->empty()) {
+//                    _process_launcher_icons(file, launcher_adaptive_icon_background_image, launcher_adaptive_icon_backgrounds[i], data);
+//                }
+//            }
+//
+//            if (file.ends_with(".so")) {
+//                bool enabled = false;
+//                for (int i = 0; i < enabled_abis.size(); ++i) {
+//                    if (file.begins_with("lib/" + enabled_abis[i] + "/")) {
+//                        invalid_abis.erase(enabled_abis[i]);
+//                        enabled = true;
+//                        break;
+//                    }
+//                }
+//                if (!enabled) {
+//                    skip = true;
+//                }
+//            }
+//
+//            if (file.begins_with("META-INF") && _signed) {
+//                skip = true;
+//            }
+//
+//            if (!skip) {
+//                print_line("ADDING: " + file);
+//
+//                // Respect decision on compression made by AAPT for the export template
+//                const bool uncompressed = info.compression_method == 0;
+//
+//                zip_fileinfo zipfi = get_zip_fileinfo();
+//
+//                zipOpenNewFileInZip(unaligned_apk,
+//                                    file.utf8().get_data(),
+//                                    &zipfi,
+//                                    NULL,
+//                                    0,
+//                                    NULL,
+//                                    0,
+//                                    NULL,
+//                                    uncompressed ? 0 : Z_DEFLATED,
+//                                    Z_DEFAULT_COMPRESSION);
+//
+//                zipWriteInFileInZip(unaligned_apk, data.ptr(), data.size());
+//                zipCloseFileInZip(unaligned_apk);
+//            }
+//
+//            ret = unzGoToNextFile(pkg);
+//        }
+
         APKExportData ed;
-        //have to change save_gradle_project_file and save_apk_so to put .so files and
-        //all the assets in the right place inside the gradle project
-        Error err = export_project_files(p_preset, save_gradle_project_file, &ed, save_gradle_project_so); //not quite sure what happens here
+        Error err = export_project_files(p_preset, save_gradle_project_file, &ed, save_gradle_project_so);
 
 		OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
 
 		String build_command;
+		String package_name = get_package_name(p_preset->get("package/unique_name"));
 
 #ifdef WINDOWS_ENABLED
 		build_command = "gradlew.bat";
@@ -2363,8 +2529,6 @@ public:
 		String build_path = ProjectSettings::get_singleton()->get_resource_path().plus_file("android/build");
 
 		build_command = build_path.plus_file(build_command);
-
-		String package_name = get_package_name(p_preset->get("package/unique_name"));
 
 		Vector<PluginConfig> enabled_plugins = get_enabled_plugins(p_preset);
 		String local_plugins_binaries = get_plugins_binaries(BINARY_TYPE_LOCAL, enabled_plugins);
