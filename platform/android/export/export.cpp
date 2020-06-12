@@ -1390,6 +1390,7 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 			return str;
 		}
 	}
+
 	void _fix_resources(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest) {
 
 		const int UTF8_FLAG = 0x00000100;
@@ -2396,11 +2397,6 @@ public:
 			ImageLoader::load_image(path, launcher_adaptive_icon_background_image);
 		}
 
-		//        String file = "res://android/build/AndroidManifest.xml";
-		//
-		//        Vector<uint8_t> android_manifest_file_data = FileAccess::get_file_as_array(file);
-		//        _fix_manifest(p_preset, android_manifest_file_data,  p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
-
 		for (int i = 0; i < icon_densities_count; ++i) {
 			//void _process_launcher_icons(const String &p_processing_file_name, const Ref<Image> &p_source_image, const LauncherIcon p_icon, Vector<uint8_t> &p_data)
 			if (launcher_icon_image.is_valid() && !launcher_icon_image->empty()) {
@@ -2423,90 +2419,12 @@ public:
 			}
 		}
 
-		//        while (ret == UNZ_OK) {
-		//
-		//            //get filename
-		//            unz_file_info info;
-		//            char fname[16384];
-		//            ret = unzGetCurrentFileInfo(pkg, &info, fname, 16384, NULL, 0, NULL, 0);
-		//
-		//            bool skip = false;
-		//
-		//            String file = fname;
-		//
-		//            Vector<uint8_t> data;
-		//            data.resize(info.uncompressed_size);
-		//
-		//            //read
-		//            unzOpenCurrentFile(pkg);
-		//            unzReadCurrentFile(pkg, data.ptrw(), data.size());
-		//            unzCloseCurrentFile(pkg);
-		//
-		//            //write
-		//
-		//            if (file == "AndroidManifest.xml") {
-		//                _fix_manifest(p_preset, data, p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
-		//            }
-		//
-		//            if (file == "resources.arsc") {
-		//                _fix_resources(p_preset, data);
-		//            }
-		//
-		//            for (int i = 0; i < icon_densities_count; ++i) {
-		//                if (launcher_icon_image.is_valid() && !launcher_icon_image->empty()) {
-		//                    _process_launcher_icons(file, launcher_icon_image, launcher_icons[i], data);
-		//                }
-		//                if (launcher_adaptive_icon_foreground_image.is_valid() && !launcher_adaptive_icon_foreground_image->empty()) {
-		//                    _process_launcher_icons(file, launcher_adaptive_icon_foreground_image, launcher_adaptive_icon_foregrounds[i], data);
-		//                }
-		//                if (launcher_adaptive_icon_background_image.is_valid() && !launcher_adaptive_icon_background_image->empty()) {
-		//                    _process_launcher_icons(file, launcher_adaptive_icon_background_image, launcher_adaptive_icon_backgrounds[i], data);
-		//                }
-		//            }
-		//
-		//            if (file.ends_with(".so")) {
-		//                bool enabled = false;
-		//                for (int i = 0; i < enabled_abis.size(); ++i) {
-		//                    if (file.begins_with("lib/" + enabled_abis[i] + "/")) {
-		//                        invalid_abis.erase(enabled_abis[i]);
-		//                        enabled = true;
-		//                        break;
-		//                    }
-		//                }
-		//                if (!enabled) {
-		//                    skip = true;
-		//                }
-		//            }
-		//
-		//            if (file.begins_with("META-INF") && _signed) {
-		//                skip = true;
-		//            }
-		//
-		//            if (!skip) {
-		//                print_line("ADDING: " + file);
-		//
-		//                // Respect decision on compression made by AAPT for the export template
-		//                const bool uncompressed = info.compression_method == 0;
-		//
-		//                zip_fileinfo zipfi = get_zip_fileinfo();
-		//
-		//                zipOpenNewFileInZip(unaligned_apk,
-		//                                    file.utf8().get_data(),
-		//                                    &zipfi,
-		//                                    NULL,
-		//                                    0,
-		//                                    NULL,
-		//                                    0,
-		//                                    NULL,
-		//                                    uncompressed ? 0 : Z_DEFLATED,
-		//                                    Z_DEFAULT_COMPRESSION);
-		//
-		//                zipWriteInFileInZip(unaligned_apk, data.ptr(), data.size());
-		//                zipCloseFileInZip(unaligned_apk);
-		//            }
-		//
-		//            ret = unzGoToNextFile(pkg);
-		//        }
+        //TODO: replicate the functionality of _fix_manifest
+
+        //        String file = "res://android/build/AndroidManifest.xml";
+        //
+        //        Vector<uint8_t> android_manifest_file_data = FileAccess::get_file_as_array(file);
+        //        _fix_manifest(p_preset, android_manifest_file_data,  p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
 
 		APKExportData ed;
 		Error err = export_project_files(p_preset, save_gradle_project_file, &ed, save_gradle_project_so);
@@ -2543,13 +2461,7 @@ public:
 		cmdline.push_back("-Pplugins_maven_repos=" + custom_maven_repos); // argument to specify the list of custom maven repos for the plugins dependencies.
 		cmdline.push_back("-p"); // argument to specify the start directory.
 		cmdline.push_back(build_path); // start directory.
-		/*{ used for debug
-            int ec;
-            String pipe;
-            OS::get_singleton()->execute(build_command, cmdline, true, NULL, NULL, &ec);
-            print_line("exit code: " + itos(ec));
-        }
-        */
+
 		//Executes the build command
 		int result = EditorNode::get_singleton()->execute_and_show_output(TTR("Building Android Project (gradle)"), build_command, cmdline);
 		if (result != 0) {
