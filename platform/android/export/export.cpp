@@ -795,6 +795,10 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
+	void _fix_manifest_plaintext(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet){
+
+	}
+
 	void _fix_manifest(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet) {
 
 		// Leaving the unused types commented because looking these constants up
@@ -2348,6 +2352,72 @@ public:
 		return have_plugins_changed || first_build;
 	}
 
+	Error _copy_value_xml_files(const Ref<EditorExportPreset> &p_preset){
+        //replicates the fuinctionality of _fix_resources method by renaming all project name strings.
+        String lib_file = "res://android/build/libs/debug/godot-lib.debug.aar";
+        FileAccess *src_f = NULL;
+        zlib_filefunc_def io = zipio_create_io_from_file(&src_f);
+        unzFile pkg = unzOpen2(lib_file.utf8().get_data(), &io);
+        if (!pkg) {
+            EditorNode::add_io_error("Could not find template AAR to open:\n" + lib_file);
+            return ERR_FILE_NOT_FOUND;
+        }
+        int ret = unzGoToFirstFile(pkg);
+
+        while (ret == UNZ_OK) {
+
+            //get filename
+            unz_file_info info;
+            char fname[16384];
+            unzGetCurrentFileInfo(pkg, &info, fname, 16384, NULL, 0, NULL, 0);
+
+            bool skip = false;
+
+            String file = fname;
+
+            Vector<uint8_t> data;
+            data.resize(info.uncompressed_size);
+
+            //read
+            unzOpenCurrentFile(pkg);
+            unzReadCurrentFile(pkg, data.ptrw(), data.size());
+            unzCloseCurrentFile(pkg);
+
+            //write
+            if (file.begins_with("res/values") && file.ends_with(".xml")) {
+//                print_line(file);
+                String dst_path = file.insert(0, "res://android/build/");
+                Error err = store_in_gradle_project(dst_path, data);
+                String xml = FileAccess::get_file_as_string(dst_path);
+                String lang = file.replace("res/values", "").replace("/values", "").replace(".xml","");
+                lang = lang.substr(0, lang.length()/2);
+                String package_name = p_preset->get("package/name");
+                if (lang.length() == 0) {
+                    xml = xml.replace("godot-project-name", get_project_name(package_name));
+                } else {
+                    lang = lang.substr(1, lang.length()-1).replace("-","_");
+                    String prop = "application/config/name_" + lang;
+                    if (ProjectSettings::get_singleton()->has_setting(prop)) {
+                        String lang_name = ProjectSettings::get_singleton()->get(prop);
+                        xml = xml.replace( "godot-project-name-"+lang, lang_name);
+                    } else {
+                        xml = xml.replace("godot-project-name-" + lang,
+                                          get_project_name(package_name));
+                    }
+                }
+//                print_line(xml);
+                FileAccess *fa = FileAccess::open(dst_path, FileAccess::WRITE);
+                fa->store_string(xml);
+                ERR_FAIL_COND_V_MSG(!fa, ERR_CANT_CREATE, "Cannot create file '" + dst_path + "'.");
+                memdelete(fa);
+            }
+            ret = unzGoToNextFile(pkg);
+        }
+
+        unzClose(pkg);
+        return OK;
+	}
+
 	Error gradle_build(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, String &src_apk, int p_flags = 0) {
 
 		{ //test that installed build version is alright
@@ -2419,12 +2489,16 @@ public:
 			}
 		}
 
-        //TODO: replicate the functionality of _fix_manifest
+		Error copy_value_xml_err = _copy_value_xml_files(p_preset);
 
-        //        String file = "res://android/build/AndroidManifest.xml";
-        //
-        //        Vector<uint8_t> android_manifest_file_data = FileAccess::get_file_as_array(file);
-        //        _fix_manifest(p_preset, android_manifest_file_data,  p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
+		//TODO: replicate the functionality of _fix_manifest
+//        XMLParser *parser = new XMLParser();//Not sure if this is right
+//		parser -> open("res://android/build/AndroidManifest.xml");
+
+//                String file = "res://android/build/AndroidManifest.xml";
+//
+//                Vector<uint8_t> android_manifest_file_data = FileAccess::get_file_as_array(file);
+//                _fix_manifest(p_preset, android_manifest_file_data,  p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
 
 		APKExportData ed;
 		Error err = export_project_files(p_preset, save_gradle_project_file, &ed, save_gradle_project_so);
@@ -2466,16 +2540,6 @@ public:
 		int result = EditorNode::get_singleton()->execute_and_show_output(TTR("Building Android Project (gradle)"), build_command, cmdline);
 		if (result != 0) {
 			EditorNode::get_singleton()->show_warning(TTR("Building of Android project failed, check output for the error.\nAlternatively visit docs.godotengine.org for Android build documentation."));
-			return ERR_CANT_CREATE;
-		}
-		if (p_debug) {
-			src_apk = build_path.plus_file("build/outputs/apk/debug/android_debug.apk");
-		} else {
-			src_apk = build_path.plus_file("build/outputs/apk/release/android_release.apk");
-		}
-
-		if (!FileAccess::exists(src_apk)) {
-			EditorNode::get_singleton()->show_warning(TTR("No build apk generated at: ") + "\n" + src_apk);
 			return ERR_CANT_CREATE;
 		}
 
