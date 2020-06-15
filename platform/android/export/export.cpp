@@ -2047,7 +2047,7 @@ public:
 		return list;
 	}
 
-	void _update_custom_build_project() {
+	void _update_custom_build_project(const String &output_gradle_path) {
 
 		DirAccessRef da = DirAccess::open("res://android");
 
@@ -2236,6 +2236,9 @@ public:
 				}
 			}
 
+			new_file = new_file.replace("android_${variant.name}.apk", output_gradle_path);
+		    print_line(new_file);
+
 			FileAccessRef f = FileAccess::open("res://android/build/build.gradle", FileAccess::WRITE);
 			f->store_string(new_file);
 			f->close();
@@ -2352,9 +2355,12 @@ public:
 		return have_plugins_changed || first_build;
 	}
 
-	Error _copy_value_xml_files(const Ref<EditorExportPreset> &p_preset){
+	Error _copy_value_xml_files(const Ref<EditorExportPreset> &p_preset, bool p_debug){
         //replicates the fuinctionality of _fix_resources method by renaming all project name strings.
         String lib_file = "res://android/build/libs/debug/godot-lib.debug.aar";
+        if(!p_debug){
+            String lib_file = "res://android/build/libs/release/godot-lib.release.aar";
+        }
         FileAccess *src_f = NULL;
         zlib_filefunc_def io = zipio_create_io_from_file(&src_f);
         unzFile pkg = unzOpen2(lib_file.utf8().get_data(), &io);
@@ -2418,26 +2424,7 @@ public:
         return OK;
 	}
 
-	Error gradle_build(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, String &src_apk, int p_flags = 0) {
-
-		{ //test that installed build version is alright
-			FileAccessRef f = FileAccess::open("res://android/.build_version", FileAccess::READ);
-			if (!f) {
-				EditorNode::get_singleton()->show_warning(TTR("Trying to build from a custom built template, but no version info for it exists. Please reinstall from the 'Project' menu."));
-				return ERR_UNCONFIGURED;
-			}
-			String version = f->get_line().strip_edges();
-			if (version != VERSION_FULL_CONFIG) {
-				EditorNode::get_singleton()->show_warning(vformat(TTR("Android build version mismatch:\n   Template installed: %s\n   Godot Version: %s\nPlease reinstall Android build template from 'Project' menu."), version, VERSION_FULL_CONFIG));
-				return ERR_UNCONFIGURED;
-			}
-		}
-		//build project if custom build is enabled
-		String sdk_path = EDITOR_GET("export/android/custom_build_sdk_path");
-		ERR_FAIL_COND_V_MSG(sdk_path == "", ERR_UNCONFIGURED, "Android SDK path must be configured in Editor Settings at 'export/android/custom_build_sdk_path'.");
-
-		_update_custom_build_project(); //alters the build.gradle, android manifest, etc.
-
+	void _copy_icon_gradle(const Ref<EditorExportPreset> &p_preset){
 		String project_icon_path = ProjectSettings::get_singleton()->get("application/config/icon");
 
 		// Prepare images to be resized for the icons. If some image ends up being uninitialized, the default image from the export template will be used.
@@ -2488,17 +2475,40 @@ public:
 				store_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
 			}
 		}
+	}
 
-		Error copy_value_xml_err = _copy_value_xml_files(p_preset);
+	Error gradle_build(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, String &src_apk, int p_flags = 0) {
+
+		{ //test that installed build version is alright
+			FileAccessRef f = FileAccess::open("res://android/.build_version", FileAccess::READ);
+			if (!f) {
+				EditorNode::get_singleton()->show_warning(TTR("Trying to build from a custom built template, but no version info for it exists. Please reinstall from the 'Project' menu."));
+				return ERR_UNCONFIGURED;
+			}
+			String version = f->get_line().strip_edges();
+			if (version != VERSION_FULL_CONFIG) {
+				EditorNode::get_singleton()->show_warning(vformat(TTR("Android build version mismatch:\n   Template installed: %s\n   Godot Version: %s\nPlease reinstall Android build template from 'Project' menu."), version, VERSION_FULL_CONFIG));
+				return ERR_UNCONFIGURED;
+			}
+		}
+		//build project if custom build is enabled
+		String sdk_path = EDITOR_GET("export/android/custom_build_sdk_path");
+		ERR_FAIL_COND_V_MSG(sdk_path == "", ERR_UNCONFIGURED, "Android SDK path must be configured in Editor Settings at 'export/android/custom_build_sdk_path'.");
+
+        String output_gradle_path = p_path.replace(ProjectSettings::get_singleton()->get_resource_path(), "")
+                                            .replace(".apk","").insert(0, "../../../../../..") + "_${variant.name}.apk";
+
+		_update_custom_build_project(output_gradle_path); //alters the build.gradle, android manifest, etc.
+		_copy_icon_gradle(p_preset);
+		Error copy_value_xml_err = _copy_value_xml_files(p_preset, p_debug);
 
 		//TODO: replicate the functionality of _fix_manifest
-//        XMLParser *parser = new XMLParser();//Not sure if this is right
-//		parser -> open("res://android/build/AndroidManifest.xml");
 
-//                String file = "res://android/build/AndroidManifest.xml";
-//
-//                Vector<uint8_t> android_manifest_file_data = FileAccess::get_file_as_array(file);
-//                _fix_manifest(p_preset, android_manifest_file_data,  p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
+//      XMLParser *parser = new XMLParser();
+//		parser -> open("res://android/build/AndroidManifest.xml");
+//		String file = "res://android/build/AndroidManifest.xml";
+//		Vector<uint8_t> android_manifest_file_data = FileAccess::get_file_as_array(file);
+//		_fix_manifest(p_preset, android_manifest_file_data,  p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
 
 		APKExportData ed;
 		Error err = export_project_files(p_preset, save_gradle_project_file, &ed, save_gradle_project_so);
@@ -2542,6 +2552,15 @@ public:
 			EditorNode::get_singleton()->show_warning(TTR("Building of Android project failed, check output for the error.\nAlternatively visit docs.godotengine.org for Android build documentation."));
 			return ERR_CANT_CREATE;
 		}
+
+//		String move_rename = "mv " + build_path + "/build/outputs/apk/debug/android_debug.apk " + p_path;
+//		print_line(move_rename);
+//		result = EditorNode::get_singleton()->execute_and_show_output(TTR("Building Android Project (gradle)"), move_rename, cmdline);
+//
+//        if (result != 0) {
+//            EditorNode::get_singleton()->show_warning(TTR("Unable to move output project. Check res://android/build/build/output/apk/<debug|release>/ for apk"));
+//            return ERR_CANT_CREATE;
+//        }
 
 		return OK;
 	}
