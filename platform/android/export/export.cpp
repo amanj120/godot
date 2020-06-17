@@ -2358,10 +2358,13 @@ public:
 
 	Error _copy_value_xml_files(const Ref<EditorExportPreset> &p_preset, bool p_debug) {
 		//replicates the functionality of _fix_resources method by renaming all project name strings.
-		String lib_file = "res://android/build/libs/debug/godot-lib.debug.aar";
-		if (!p_debug) {
-			String lib_file = "res://android/build/libs/release/godot-lib.release.aar";
-		}
+        String lib_file;
+        if (p_debug) {
+            lib_file = "res://android/build/libs/debug/godot-lib.debug.aar";
+        } else {
+            lib_file = "res://android/build/libs/release/godot-lib.release.aar";
+        }
+
 		FileAccess *src_f = NULL;
 		zlib_filefunc_def io = zipio_create_io_from_file(&src_f);
 		unzFile pkg = unzOpen2(lib_file.utf8().get_data(), &io);
@@ -2378,8 +2381,6 @@ public:
 			char fname[16384];
 			unzGetCurrentFileInfo(pkg, &info, fname, 16384, NULL, 0, NULL, 0);
 
-			bool skip = false;
-
 			String file = fname;
 
 			Vector<uint8_t> data;
@@ -2394,6 +2395,11 @@ public:
 			if (file.begins_with("res/values") && file.ends_with(".xml")) {
 				String dst_path = file.insert(0, "res://android/build/");
 				Error err = store_in_gradle_project(dst_path, data);
+				if (err != OK) {
+					EditorNode::add_io_error("Could not store " + dst_path + "\n");
+					unzClose(pkg);
+					return err;
+				}
 				String xml = FileAccess::get_file_as_string(dst_path);
 				String lang = file.replace("res/values", "").replace("/values", "").replace(".xml", "");
 				lang = lang.substr(0, lang.length() / 2);
@@ -2490,7 +2496,7 @@ public:
 				return ERR_UNCONFIGURED;
 			}
 		}
-		//build project if custom build is enabled
+
 		String sdk_path = EDITOR_GET("export/android/custom_build_sdk_path");
 		ERR_FAIL_COND_V_MSG(sdk_path == "", ERR_UNCONFIGURED, "Android SDK path must be configured in Editor Settings at 'export/android/custom_build_sdk_path'.");
 
@@ -2502,12 +2508,26 @@ public:
 		_update_custom_build_project(output_gradle_path); //alters the build.gradle, android manifest, etc.
 		_copy_icon_gradle(p_preset);
 		Error copy_value_xml_err = _copy_value_xml_files(p_preset, p_debug);
+		if (copy_value_xml_err != OK){
+			EditorNode::add_io_error("Could not copy values.xml from lib-godot.<debug|release>.aar file\n");
+			return copy_value_xml_err;
+		}
 
 		String manifest_path = "res://android/build/AndroidManifest.xml";
 		Error err = _fix_manifest_plaintext(p_preset, manifest_path, p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
 
+		if (err != OK){
+            EditorNode::add_io_error("Could not fix Android Manifest file\n");
+            return err;
+		}
+
 		APKExportData ed;
 		err = export_project_files(p_preset, save_gradle_project_file, &ed, save_gradle_project_so);
+
+        if (err != OK){
+            EditorNode::add_io_error("Could not export project files to gradle project\n");
+            return err;
+        }
 
 		OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
 
