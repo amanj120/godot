@@ -2048,7 +2048,7 @@ public:
 		return list;
 	}
 
-	void _update_custom_build_project(const String &output_gradle_path) {
+	void _update_custom_build_project(const String &output_apk_path) {
 
 		DirAccessRef da = DirAccess::open("res://android");
 
@@ -2238,7 +2238,7 @@ public:
 			}
 
 			//edit output path
-			new_file = new_file.replace("android_${variant.name}.apk", output_gradle_path);
+			new_file = new_file.replace("android_${variant.name}.apk", output_apk_path);
 
 			FileAccessRef f = FileAccess::open("res://android/build/build.gradle", FileAccess::WRITE);
 			f->store_string(new_file);
@@ -2500,12 +2500,15 @@ public:
 		String sdk_path = EDITOR_GET("export/android/custom_build_sdk_path");
 		ERR_FAIL_COND_V_MSG(sdk_path == "", ERR_UNCONFIGURED, "Android SDK path must be configured in Editor Settings at 'export/android/custom_build_sdk_path'.");
 
-		String output_gradle_path = p_path.replace(ProjectSettings::get_singleton()->get_resource_path(), "")
-											.replace(".apk", "")
-											.insert(0, "../../../../../..") +
-									"_${variant.name}.apk";
+		if (p_path.find(ProjectSettings::get_singleton()->get_resource_path(), 0) == -1) {
+			EditorNode::add_io_error("The output apk must be saved within your godot project directory\n");
+			return ERR_CANT_CREATE;
+		}
+		String apk_relative_path = p_path.replace(ProjectSettings::get_singleton()->get_resource_path(), "");
+		//the default output path is res://android/build/build/output/<debug|release>/apk/android_<debug|release>.apk, hence the ../../../../../..
+		String output_apk_path = apk_relative_path.replace(".apk", "").insert(0, "../../../../../..") + "_${variant.name}.apk";
 
-		_update_custom_build_project(output_gradle_path); //alters the build.gradle, android manifest, etc.
+		_update_custom_build_project(output_apk_path); //alters the build.gradle, android manifest, etc.
 		_copy_icon_gradle(p_preset);
 		Error copy_value_xml_err = _copy_value_xml_files(p_preset, p_debug);
 		if (copy_value_xml_err != OK) {
