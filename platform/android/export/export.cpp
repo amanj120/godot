@@ -797,6 +797,64 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 
 	Error _fix_manifest_plaintext(const Ref<EditorExportPreset> &p_preset, String &manifest_path, bool p_give_internet) {
 		//TODO: replicate the functionality of _fix_manifest by editing the plaintext AndroidManifest.xml file
+		String manifest_text = ANDROID_MANIFEST_TEXT;
+
+		String package_name = p_preset->get("package/unique_name");
+		manifest_text = manifest_text.replace("PACKAGE_NAME_HERE", package_name);
+
+        String version_name = p_preset->get("version/name");
+        int version_code = p_preset->get("version/code");
+		manifest_text = manifest_text.replace("VERSION_NAME_HERE", version_name);
+		manifest_text = manifest_text.replace("VERSION_CODE_HERE", itos(version_code));
+
+
+        bool min_gles3 = ProjectSettings::get_singleton()->get("rendering/quality/driver/driver_name") == "GLES3" &&
+                         !ProjectSettings::get_singleton()->get("rendering/quality/driver/fallback_to_gles2");
+        String gles_version = min_gles3 ? "0x00030000" : "0x00020000";
+        manifest_text = manifest_text.replace("GLES_VERSION_HERE", gles_version);
+
+		int orientation = p_preset->get("screen/orientation");
+        bool screen_support_small = p_preset->get("screen/support_small");
+        bool screen_support_normal = p_preset->get("screen/support_normal");
+        bool screen_support_large = p_preset->get("screen/support_large");
+        bool screen_support_xlarge = p_preset->get("screen/support_xlarge");
+        int xr_mode_index = p_preset->get("xr_features/xr_mode");
+        bool focus_awareness = p_preset->get("xr_features/focus_awareness");
+        String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
+        Vector<String> perms;
+
+        const char **aperms = android_perms;
+        while (*aperms) {
+            bool enabled = p_preset->get("permissions/" + String(*aperms).to_lower());
+            if (enabled)
+                perms.push_back("android.permission." + String(*aperms));
+            aperms++;
+        }
+
+        PoolStringArray user_perms = p_preset->get("permissions/custom_permissions");
+        for (int i = 0; i < user_perms.size(); i++) {
+            String user_perm = user_perms[i].strip_edges();
+            if (!user_perm.empty()) {
+                perms.push_back(user_perm);
+            }
+        }
+
+        if (p_give_internet) {
+            if (perms.find("android.permission.INTERNET") == -1)
+                perms.push_back("android.permission.INTERNET");
+        }
+
+        FileAccessRef f = FileAccess::open(manifest_path, FileAccess::READ);
+        String android_manifest = FileAccess::get_file_as_string(manifest_path);
+
+        if (f) {
+            String section;
+            while (!f->eof_reached()) {
+                String l = f->get_line();
+                String k = l.strip_edges();
+            }
+            f->close();
+        }
 		return OK;
 	}
 
