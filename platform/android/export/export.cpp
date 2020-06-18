@@ -859,8 +859,8 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
         int xr_mode_index = p_preset->get("xr_features/xr_mode");
         bool focus_awareness = p_preset->get("xr_features/focus_awareness");
         String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
-
-
+		//TODO: figure out how to modify Manifest for the three features listed above
+		
         FileAccessRef f = FileAccess::open(manifest_path, FileAccess::READ);
 		f->store_string(manifest_text);
 		return OK;

@@ -78,7 +78,7 @@ String ANDROID_MANIFEST_TEXT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                                "        <!-- Metadata populated at export time and used by Godot to figure out which plugins must be enabled. -->\n"
                                "        <meta-data\n"
                                "            android:name=\"PLUGINS_HERE\"\n"
-                               "            android:value=\"PLUGINS_VALUES_HERE\"/>\n" //might need something for degrees of freedom here
+                               "            android:value=\"PLUGINS_VALUES_HERE\"/>\n"
                                "\n"
                                "        <activity\n"
                                "            android:name=\".GodotApp\"\n"
@@ -93,7 +93,7 @@ String ANDROID_MANIFEST_TEXT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                                "            <!-- Focus awareness metadata populated at export time if the user enables it in the 'Xr Features' section. -->\n"
                                "            <meta-data\n"
                                "                android:name=\"com.oculus.vr.focusaware\"\n" //possibly need to update this and the line below with the *_HERE tags
-                               "                android:value=\"oculus_focus_aware_value\"/>\n" //might also need something for hand tracking
+                               "                android:value=\"oculus_focus_aware_value\"/>\n" //might also need something for hand tracking and degrees of freedom
                                "\n"
                                "            <intent-filter>\n"
                                "                <action android:name=\"android.intent.action.MAIN\" />\n"
