@@ -198,6 +198,7 @@ static const char *android_perms[] = {
 	NULL
 };
 
+//TODO: put this somewhere better (i.e. templates folder)
 const String ANDROID_MANIFEST_TEXT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
 									 "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
 									 "    xmlns:tools=\"http://schemas.android.com/tools\"\n"
