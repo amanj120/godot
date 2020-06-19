@@ -207,6 +207,8 @@ const String ANDROID_MANIFEST_TEXT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 									 "    android:versionName=\"*VERSION_NAME*\"\n"
 									 "    android:installLocation=\"auto\" >\n"
 									 "\n"
+									 "<instrumentation android:targetPackage=\"*INSTR_PACKAGE_NAME*\"/>\n"
+									 "\n"
 									 "    <!-- Adding custom text to the manifest is fine, but do it outside the custom USER and APPLICATION BEGIN/END comments, -->\n"
 									 "    <!-- as that gets rewritten. -->\n"
 									 "\n"
@@ -911,7 +913,8 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		String manifest_text = ANDROID_MANIFEST_TEXT;
 
 		String package_name = p_preset->get("package/unique_name");
-		manifest_text = manifest_text.replace("*PACKAGE_NAME*", package_name);
+		manifest_text = manifest_text.replace("*PACKAGE_NAME*", get_package_name(package_name));
+		manifest_text = manifest_text.replace("*INSTR_PACKAGE_NAME*", get_package_name(package_name));
 
 		String version_name = p_preset->get("version/name");
 		int version_code = p_preset->get("version/code");
@@ -953,6 +956,9 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		int xr_mode_index = p_preset->get("xr_features/xr_mode");
 		String focus_awareness = bool_to_string(p_preset->get("xr_features/focus_awareness"));
 		String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
+		if (plugins_names.empty()) {
+			plugins_names = "plugins_value";
+		}
 		String feature_string;
 
 		if (xr_mode_index == 1 /* XRMode.OVR */) {
@@ -964,9 +970,9 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 
 			if (dof_index > 0) {
 				if (dof_index == 2) {
-					feature_string = feature_string.insert(0, "<uses-feature android:name=\"android.hardware.vr.headtracking\" android:required=\"true\"/>\n");
+					feature_string = feature_string.insert(0, "<uses-feature android:name=\"android.hardware.vr.headtracking\" android:required=\"true\" android:version=\"1\"/>\n");
 				} else {
-					feature_string = feature_string.insert(0, "<uses-feature android:name=\"android.hardware.vr.headtracking\" android:required=\"false\"/>\n");
+					feature_string = feature_string.insert(0, "<uses-feature android:name=\"android.hardware.vr.headtracking\" android:required=\"false\" android:version=\"1\"/>\n");
 				}
 			}
 
@@ -982,7 +988,6 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 
 		manifest_text = manifest_text.replace("*FEATURES*", feature_string);
 		manifest_text = manifest_text.replace("*PLUGINS_VALUES*", plugins_names);
-		print_line(manifest_text);
 		FileAccess *f = FileAccess::open(manifest_path, FileAccess::WRITE);
 		ERR_FAIL_COND_V_MSG(!f, ERR_CANT_CREATE, "Cannot create file '" + manifest_path + "'.");
 		f->store_string(manifest_text);
