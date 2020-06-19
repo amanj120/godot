@@ -221,6 +221,7 @@ const String ANDROID_MANIFEST_TEXT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 									 "        android:glEsVersion=\"*GLES_VERSION*\"\n"
 									 "        android:required=\"true\" />\n"
 									 "\n"
+									 "*FEATURES*\n"
 									 "<!-- Custom user permissions XML added by add-ons. It's recommended to add them from the export preset, though. -->\n"
 									 "<!--CHUNK_USER_PERMISSIONS_BEGIN-->\n"
 									 "<!--CHUNK_USER_PERMISSIONS_END-->\n"
@@ -890,6 +891,16 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 			if (perms.find("android.permission.INTERNET") == -1)
 				perms.push_back("android.permission.INTERNET");
 		}
+
+		int xr_mode_index = p_preset->get("xr_features/xr_mode");
+		if (xr_mode_index == 1 /* XRMode.OVR */) {
+			int hand_tracking_index = p_preset->get("xr_features/hand_tracking"); // 0: none, 1: optional, 2: required
+			if (hand_tracking_index > 0) {
+				if (perms.find("com.oculus.permission.HAND_TRACKING") == -1) {
+					perms.push_back("com.oculus.permission.HAND_TRACKING");
+				}
+			}
+		}
 		return perms;
 	}
 
@@ -934,12 +945,34 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
 		//TODO: look at the "uses features" in _fix_manifest, update permissions for hand tracking and stuff
 
+		String feature_string;
+
 		if (xr_mode_index == 1 /* XRMode.OVR */) {
 			manifest_text = manifest_text.replace("*XR_MODE_METADATA_NAME*", "com.samsung.android.vr.application.mode");
 			manifest_text = manifest_text.replace("*XR_MODE_METADATA_VALUE*", "vr_only");
 			manifest_text = manifest_text.replace("*FOCUS_AWARE_VALUE*", focus_awareness);
+
+			int dof_index = p_preset->get("xr_features/degrees_of_freedom"); // 0: none, 1: 3dof and 6dof, 2: 6dof
+
+			if (dof_index > 0) {
+				if (dof_index == 2) {
+					feature_string = feature_string.insert(0, "<uses-feature android:glEsVersion=\"android.hardware.vr.headtracking\" android:required=\"true\" android:glEsVersion=\"" + gles_version + "\"/>");
+				} else {
+					feature_string = feature_string.insert(0, "<uses-feature android:glEsVersion=\"android.hardware.vr.headtracking\" android:required=\"false\" android:glEsVersion=\"" + gles_version + "\"/>");
+				}
+			}
+
+			int hand_tracking_index = p_preset->get("xr_features/hand_tracking"); // 0: none, 1: optional, 2: required
+			if (hand_tracking_index > 0) {
+				if (hand_tracking_index == 2) {
+					feature_string = feature_string.insert(0, "<uses-feature android:glEsVersion=\"oculus.software.handtracking\" android:required=\"true\"/>");
+				} else {
+					feature_string = feature_string.insert(0, "<uses-feature android:glEsVersion=\"oculus.software.handtracking\" android:required=\"false\"/>");
+				}
+			}
 		}
 
+		manifest_text = manifest_text.replace("*FEATURES*", feature_string);
 		manifest_text = manifest_text.replace("*PLUGINS_VALUES*", plugins_names);
 
 		FileAccessRef f = FileAccess::open(manifest_path, FileAccess::READ);
