@@ -836,8 +836,8 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
         String gles_version = min_gles3 ? "0x00030000" : "0x00020000";
         manifest_text = manifest_text.replace("GLES_VERSION_HERE", gles_version);
 
-		int orientation = p_preset->get("screen/orientation");
-		manifest_text = manifest_text.replace("GLES_VERSION_HERE", itos(orientation));
+		int orientation = p_preset->get("screen/orientation"); //TODO: why is this an int?
+		manifest_text = manifest_text.replace("SCREEN_ORIENTATION_HERE", itos(orientation));
 
 
         String screen_support_small = p_preset->get("screen/support_small") ? "true" : "false";
@@ -860,7 +860,7 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
         bool focus_awareness = p_preset->get("xr_features/focus_awareness");
         String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
 		//TODO: figure out how to modify Manifest for the three features listed above
-		
+
         FileAccessRef f = FileAccess::open(manifest_path, FileAccess::READ);
 		f->store_string(manifest_text);
 		return OK;
