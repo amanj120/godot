@@ -795,7 +795,7 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
-	Vector<String> _get_permissions(const Ref<EditorExportPreset> &p_preset, bool p_give_internet){
+	Vector<String> _get_permissions(const Ref<EditorExportPreset> &p_preset, bool p_give_internet) {
 		Vector<String> perms;
 		const char **aperms = android_perms;
 		while (*aperms) {
@@ -816,54 +816,6 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 				perms.push_back("android.permission.INTERNET");
 		}
 		return perms;
-	}
-
-	Error _fix_manifest_plaintext(const Ref<EditorExportPreset> &p_preset, String &manifest_path, bool p_give_internet) {
-		//TODO: replicate the functionality of _fix_manifest by editing the plaintext AndroidManifest.xml file
-		String manifest_text = ANDROID_MANIFEST_TEXT;
-
-		String package_name = p_preset->get("package/unique_name");
-		manifest_text = manifest_text.replace("PACKAGE_NAME_HERE", package_name);
-
-        String version_name = p_preset->get("version/name");
-        int version_code = p_preset->get("version/code");
-		manifest_text = manifest_text.replace("VERSION_NAME_HERE", version_name);
-		manifest_text = manifest_text.replace("VERSION_CODE_HERE", itos(version_code));
-
-
-        bool min_gles3 = ProjectSettings::get_singleton()->get("rendering/quality/driver/driver_name") == "GLES3" &&
-                         !ProjectSettings::get_singleton()->get("rendering/quality/driver/fallback_to_gles2");
-        String gles_version = min_gles3 ? "0x00030000" : "0x00020000";
-        manifest_text = manifest_text.replace("GLES_VERSION_HERE", gles_version);
-
-		int orientation = p_preset->get("screen/orientation"); //TODO: why is this an int?
-		manifest_text = manifest_text.replace("SCREEN_ORIENTATION_HERE", itos(orientation));
-
-
-        String screen_support_small = p_preset->get("screen/support_small") ? "true" : "false";
-        String screen_support_normal = p_preset->get("screen/support_normal") ? "true" : "false";
-        String screen_support_large = p_preset->get("screen/support_large") ? "true" : "false";
-        String screen_support_xlarge = p_preset->get("screen/support_xlarge") ? "true" : "false";
-		manifest_text = manifest_text.replace("SMALL_SCREENS_HERE", screen_support_small);
-		manifest_text = manifest_text.replace("NORMAL_SCREENS_HERE", screen_support_normal);
-		manifest_text = manifest_text.replace("LARGE_SCREENS_HERE", screen_support_large);
-		manifest_text = manifest_text.replace("X_LARGE_SCREENS_HERE", screen_support_xlarge);
-
-		Vector<String> perms = _get_permissions(p_preset, p_give_internet);
-		String permission_string;
-		for(int i = 0; i < perms.size(); i++){
-			permission_string.insert(0, "\t<uses-permission android:name=\"" + perms.get(i) + "\"/>\n");
-		}
-		manifest_text = manifest_text.replace("PERMISSIONS_HERE", permission_string);
-
-        int xr_mode_index = p_preset->get("xr_features/xr_mode");
-        bool focus_awareness = p_preset->get("xr_features/focus_awareness");
-        String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
-		//TODO: figure out how to modify Manifest for the three features listed above
-
-        FileAccessRef f = FileAccess::open(manifest_path, FileAccess::READ);
-		f->store_string(manifest_text);
-		return OK;
 	}
 
 	void _fix_manifest(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet) {
