@@ -241,7 +241,7 @@ const String ANDROID_MANIFEST_TEXT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 									 "\n"
 									 "        <!-- Metadata populated at export time and used by Godot to figure out which plugins must be enabled. -->\n"
 									 "        <meta-data\n"
-									 "            android:name=\"*PLUGINS*\"\n"
+									 "            android:name=\"plugins\"\n"
 									 "            android:value=\"*PLUGINS_VALUES*\"/>\n"
 									 "\n"
 									 "        <activity\n"
@@ -256,8 +256,8 @@ const String ANDROID_MANIFEST_TEXT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 									 "\n"
 									 "            <!-- Focus awareness metadata populated at export time if the user enables it in the 'Xr Features' section. -->\n"
 									 "            <meta-data\n"
-									 "                android:name=\"com.oculus.vr.focusaware\"\n" //possibly need to update this and the line below with the *_HERE tags
-									 "                android:value=\"oculus_focus_aware_value\"/>\n" //might also need something for hand tracking and degrees of freedom
+									 "                android:name=\"com.oculus.vr.focusaware\"\n"
+									 "                android:value=\"*FOCUS_AWARE_VALUE*\"/>\n"
 									 "\n"
 									 "            <intent-filter>\n"
 									 "                <action android:name=\"android.intent.action.MAIN\" />\n"
@@ -930,9 +930,17 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		manifest_text = manifest_text.replace("*PERMISSIONS*", permission_string);
 
 		int xr_mode_index = p_preset->get("xr_features/xr_mode");
-		bool focus_awareness = p_preset->get("xr_features/focus_awareness");
+		String focus_awareness = p_preset->get("xr_features/focus_awareness") ? "true" : "false";
 		String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
-		//TODO: figure out how to modify Manifest for the three features listed above
+		//TODO: look at the "uses features" in _fix_manifest, update permissions for hand tracking and stuff
+
+		if (xr_mode_index == 1 /* XRMode.OVR */) {
+			manifest_text = manifest_text.replace("*XR_MODE_METADATA_NAME*", "com.samsung.android.vr.application.mode");
+			manifest_text = manifest_text.replace("*XR_MODE_METADATA_VALUE*", "vr_only");
+			manifest_text = manifest_text.replace("*FOCUS_AWARE_VALUE*", focus_awareness);
+		}
+
+		manifest_text = manifest_text.replace("*PLUGINS_VALUES*", plugins_names);
 
 		FileAccessRef f = FileAccess::open(manifest_path, FileAccess::READ);
 		f->store_string(manifest_text);
