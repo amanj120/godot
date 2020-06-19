@@ -818,6 +818,11 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return perms;
 	}
 
+	Error _fix_manifest_plaintext(const Ref<EditorExportPreset> &p_preset, String &manifest_path, bool p_give_internet) {
+		//TODO: replicate the functionality of _fix_manifest by editing the plaintext AndroidManifest.xml file
+		return OK;
+	}
+
 	void _fix_manifest(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet) {
 
 		// Leaving the unused types commented because looking these constants up
