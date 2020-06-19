@@ -871,37 +871,39 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
-	Vector<String> _get_permissions(const Ref<EditorExportPreset> &p_preset, bool p_give_internet) {
-		Vector<String> perms;
+	String bool_to_string(bool v) {
+		return v ? "true" : "false";
+	}
+
+	void _get_permissions(const Ref<EditorExportPreset> &p_preset, bool p_give_internet, Vector<String> *perms) {
 		const char **aperms = android_perms;
 		while (*aperms) {
 			bool enabled = p_preset->get("permissions/" + String(*aperms).to_lower());
 			if (enabled)
-				perms.push_back("android.permission." + String(*aperms));
+				perms->push_back("android.permission." + String(*aperms));
 			aperms++;
 		}
 		PoolStringArray user_perms = p_preset->get("permissions/custom_permissions");
 		for (int i = 0; i < user_perms.size(); i++) {
 			String user_perm = user_perms[i].strip_edges();
 			if (!user_perm.empty()) {
-				perms.push_back(user_perm);
+				perms->push_back(user_perm);
 			}
 		}
 		if (p_give_internet) {
-			if (perms.find("android.permission.INTERNET") == -1)
-				perms.push_back("android.permission.INTERNET");
+			if (perms->find("android.permission.INTERNET") == -1)
+				perms->push_back("android.permission.INTERNET");
 		}
 
 		int xr_mode_index = p_preset->get("xr_features/xr_mode");
 		if (xr_mode_index == 1 /* XRMode.OVR */) {
 			int hand_tracking_index = p_preset->get("xr_features/hand_tracking"); // 0: none, 1: optional, 2: required
 			if (hand_tracking_index > 0) {
-				if (perms.find("com.oculus.permission.HAND_TRACKING") == -1) {
-					perms.push_back("com.oculus.permission.HAND_TRACKING");
+				if (perms->find("com.oculus.permission.HAND_TRACKING") == -1) {
+					perms->push_back("com.oculus.permission.HAND_TRACKING");
 				}
 			}
 		}
-		return perms;
 	}
 
 	Error _fix_manifest_plaintext(const Ref<EditorExportPreset> &p_preset, String &manifest_path, bool p_give_internet) {
@@ -922,29 +924,35 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		manifest_text = manifest_text.replace("*GLES_VERSION*", gles_version);
 
 		int orientation = p_preset->get("screen/orientation"); //TODO: why is this an int?
-		manifest_text = manifest_text.replace("*SCREEN_ORIENTATION*", itos(orientation));
+		String orientation_name;
+		if (orientation == 0) {
+			orientation_name = "landscape";
+		}
+		if (orientation == 1) {
+			orientation_name = "portrait";
+		}
+		manifest_text = manifest_text.replace("*SCREEN_ORIENTATION*", orientation_name);
 
-		String screen_support_small = p_preset->get("screen/support_small") ? "true" : "false";
-		String screen_support_normal = p_preset->get("screen/support_normal") ? "true" : "false";
-		String screen_support_large = p_preset->get("screen/support_large") ? "true" : "false";
-		String screen_support_xlarge = p_preset->get("screen/support_xlarge") ? "true" : "false";
+		String screen_support_small = bool_to_string(p_preset->get("screen/support_small"));
+		String screen_support_normal = bool_to_string(p_preset->get("screen/support_normal"));
+		String screen_support_large = bool_to_string(p_preset->get("screen/support_large"));
+		String screen_support_xlarge = bool_to_string(p_preset->get("screen/support_xlarge"));
 		manifest_text = manifest_text.replace("*SMALL_SCREENS*", screen_support_small);
 		manifest_text = manifest_text.replace("*NORMAL_SCREENS*", screen_support_normal);
 		manifest_text = manifest_text.replace("*LARGE_SCREENS*", screen_support_large);
 		manifest_text = manifest_text.replace("*X_LARGE_SCREENS*", screen_support_xlarge);
 
-		Vector<String> perms = _get_permissions(p_preset, p_give_internet);
+		Vector<String> perms;
+		_get_permissions(p_preset, p_give_internet, &perms);
 		String permission_string;
 		for (int i = 0; i < perms.size(); i++) {
-			permission_string.insert(0, "\t<uses-permission android:name=\"" + perms.get(i) + "\"/>\n");
+			permission_string = permission_string.insert(0, "\t<uses-permission android:name=\"" + perms.get(i) + "\"/>\n");
 		}
 		manifest_text = manifest_text.replace("*PERMISSIONS*", permission_string);
 
 		int xr_mode_index = p_preset->get("xr_features/xr_mode");
 		String focus_awareness = p_preset->get("xr_features/focus_awareness") ? "true" : "false";
 		String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
-		//TODO: look at the "uses features" in _fix_manifest, update permissions for hand tracking and stuff
-
 		String feature_string;
 
 		if (xr_mode_index == 1 /* XRMode.OVR */) {
@@ -956,27 +964,29 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 
 			if (dof_index > 0) {
 				if (dof_index == 2) {
-					feature_string = feature_string.insert(0, "<uses-feature android:glEsVersion=\"android.hardware.vr.headtracking\" android:required=\"true\" android:glEsVersion=\"" + gles_version + "\"/>");
+					feature_string = feature_string.insert(0, "<uses-feature android:name=\"android.hardware.vr.headtracking\" android:required=\"true\"/>\n");
 				} else {
-					feature_string = feature_string.insert(0, "<uses-feature android:glEsVersion=\"android.hardware.vr.headtracking\" android:required=\"false\" android:glEsVersion=\"" + gles_version + "\"/>");
+					feature_string = feature_string.insert(0, "<uses-feature android:name=\"android.hardware.vr.headtracking\" android:required=\"false\"/>\n");
 				}
 			}
 
 			int hand_tracking_index = p_preset->get("xr_features/hand_tracking"); // 0: none, 1: optional, 2: required
 			if (hand_tracking_index > 0) {
 				if (hand_tracking_index == 2) {
-					feature_string = feature_string.insert(0, "<uses-feature android:glEsVersion=\"oculus.software.handtracking\" android:required=\"true\"/>");
+					feature_string = feature_string.insert(0, "<uses-feature android:name=\"oculus.software.handtracking\" android:required=\"true\"/>\n");
 				} else {
-					feature_string = feature_string.insert(0, "<uses-feature android:glEsVersion=\"oculus.software.handtracking\" android:required=\"false\"/>");
+					feature_string = feature_string.insert(0, "<uses-feature android:name=\"oculus.software.handtracking\" android:required=\"false\"/>\n");
 				}
 			}
 		}
 
 		manifest_text = manifest_text.replace("*FEATURES*", feature_string);
 		manifest_text = manifest_text.replace("*PLUGINS_VALUES*", plugins_names);
-
-		FileAccessRef f = FileAccess::open(manifest_path, FileAccess::READ);
+		print_line(manifest_text);
+		FileAccess *f = FileAccess::open(manifest_path, FileAccess::WRITE);
+		ERR_FAIL_COND_V_MSG(!f, ERR_CANT_CREATE, "Cannot create file '" + manifest_path + "'.");
 		f->store_string(manifest_text);
+		memdelete(f);
 		return OK;
 	}
 
@@ -1026,7 +1036,8 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 
 		String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
 
-		Vector<String> perms = _get_permissions(p_preset, p_give_internet);
+		Vector<String> perms;
+		_get_permissions(p_preset, p_give_internet, &perms);
 
 		while (ofs < (uint32_t)p_manifest.size()) {
 
