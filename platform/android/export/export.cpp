@@ -901,6 +901,7 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 				}
 			}
 		}
+
 		return perms;
 	}
 
