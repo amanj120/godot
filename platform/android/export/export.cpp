@@ -951,7 +951,7 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		manifest_text = manifest_text.replace("*PERMISSIONS*", permission_string);
 
 		int xr_mode_index = p_preset->get("xr_features/xr_mode");
-		String focus_awareness = p_preset->get("xr_features/focus_awareness") ? "true" : "false";
+		String focus_awareness = bool_to_string(p_preset->get("xr_features/focus_awareness"));
 		String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
 		String feature_string;
 
