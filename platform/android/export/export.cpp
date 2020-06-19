@@ -198,6 +198,80 @@ static const char *android_perms[] = {
 	NULL
 };
 
+const String ANDROID_MANIFEST_TEXT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+									 "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
+									 "    xmlns:tools=\"http://schemas.android.com/tools\"\n"
+									 "    package=\"*PACKAGE_NAME*\"\n"
+									 "    android:versionCode=\"*VERSION_CODE*\"\n"
+									 "    android:versionName=\"*VERSION_NAME*\"\n"
+									 "    android:installLocation=\"auto\" >\n"
+									 "\n"
+									 "    <!-- Adding custom text to the manifest is fine, but do it outside the custom USER and APPLICATION BEGIN/END comments, -->\n"
+									 "    <!-- as that gets rewritten. -->\n"
+									 "\n"
+									 "    <supports-screens\n"
+									 "        android:smallScreens=\"*SMALL_SCREENS*\"\n"
+									 "        android:normalScreens=\"*NORMAL_SCREENS*\"\n"
+									 "        android:largeScreens=\"*LARGE_SCREENS*\"\n"
+									 "        android:xlargeScreens=\"*X_LARGE_SCREENS*\" />\n"
+									 "\n"
+									 "    <!-- glEsVersion is modified by the exporter, changing this value here has no effect. -->\n"
+									 "    <uses-feature\n"
+									 "        android:glEsVersion=\"*GLES_VERSION*\"\n"
+									 "        android:required=\"true\" />\n"
+									 "\n"
+									 "<!-- Custom user permissions XML added by add-ons. It's recommended to add them from the export preset, though. -->\n"
+									 "<!--CHUNK_USER_PERMISSIONS_BEGIN-->\n"
+									 "<!--CHUNK_USER_PERMISSIONS_END-->\n"
+									 "*PERMISSIONS*\n"
+									 "\n"
+									 "    <!-- Any tag in this line after android:icon will be erased when doing custom builds. -->\n"
+									 "    <!-- If you want to add tags manually, do before it. -->\n"
+									 "    <!-- WARNING: This should stay on a single line until the parsing code is improved. See GH-32414. -->\n"
+									 "    <application android:label=\"@string/godot_project_name_string\" android:allowBackup=\"false\" tools:ignore=\"GoogleAppIndexingWarning\" android:icon=\"@mipmap/icon\" >\n"
+									 "\n"
+									 "        <!-- The following metadata values are replaced when Godot exports, modifying them here has no effect. -->\n"
+									 "        <!-- Do these changes in the export preset. Adding new ones is fine. -->\n"
+									 "\n"
+									 "        <!-- XR mode metadata. This is modified by the exporter based on the selected xr mode. DO NOT CHANGE the values here. -->\n"
+									 "        <meta-data\n" //
+									 "            android:name=\"*XR_MODE_METADATA_NAME*\"\n"
+									 "            android:value=\"*XR_MODE_METADATA_VALUE*\" />\n"
+									 "\n"
+									 "        <!-- Metadata populated at export time and used by Godot to figure out which plugins must be enabled. -->\n"
+									 "        <meta-data\n"
+									 "            android:name=\"*PLUGINS*\"\n"
+									 "            android:value=\"*PLUGINS_VALUES*\"/>\n"
+									 "\n"
+									 "        <activity\n"
+									 "            android:name=\".GodotApp\"\n"
+									 "            android:label=\"@string/godot_project_name_string\"\n"
+									 "            android:theme=\"@android:style/Theme.Black.NoTitleBar.Fullscreen\"\n"
+									 "            android:launchMode=\"singleTask\"\n"
+									 "            android:screenOrientation=\"*SCREEN_ORIENTATION*\"\n"
+									 "            android:configChanges=\"orientation|keyboardHidden|screenSize|smallestScreenSize|density|keyboard|navigation|screenLayout|uiMode\"\n"
+									 "            android:resizeableActivity=\"false\"\n"
+									 "            tools:ignore=\"UnusedAttribute\" >\n"
+									 "\n"
+									 "            <!-- Focus awareness metadata populated at export time if the user enables it in the 'Xr Features' section. -->\n"
+									 "            <meta-data\n"
+									 "                android:name=\"com.oculus.vr.focusaware\"\n" //possibly need to update this and the line below with the *_HERE tags
+									 "                android:value=\"oculus_focus_aware_value\"/>\n" //might also need something for hand tracking and degrees of freedom
+									 "\n"
+									 "            <intent-filter>\n"
+									 "                <action android:name=\"android.intent.action.MAIN\" />\n"
+									 "                <category android:name=\"android.intent.category.LAUNCHER\" />\n"
+									 "            </intent-filter>\n"
+									 "        </activity>\n"
+									 "\n"
+									 "<!-- Custom application XML added by add-ons. -->\n"
+									 "<!--CHUNK_APPLICATION_BEGIN-->\n"
+									 "<!--CHUNK_APPLICATION_END-->\n"
+									 "\n"
+									 "    </application>\n"
+									 "\n"
+									 "</manifest>";
+
 struct LauncherIcon {
 	const char *export_path;
 	int dimensions;
@@ -823,38 +897,38 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		String manifest_text = ANDROID_MANIFEST_TEXT;
 
 		String package_name = p_preset->get("package/unique_name");
-		manifest_text = manifest_text.replace("PACKAGE_NAME_HERE", package_name);
+		manifest_text = manifest_text.replace("*PACKAGE_NAME*", package_name);
 
         String version_name = p_preset->get("version/name");
         int version_code = p_preset->get("version/code");
-		manifest_text = manifest_text.replace("VERSION_NAME_HERE", version_name);
-		manifest_text = manifest_text.replace("VERSION_CODE_HERE", itos(version_code));
+		manifest_text = manifest_text.replace("*VERSION_NAME*", version_name);
+		manifest_text = manifest_text.replace("*VERSION_CODE*", itos(version_code));
 
 
         bool min_gles3 = ProjectSettings::get_singleton()->get("rendering/quality/driver/driver_name") == "GLES3" &&
                          !ProjectSettings::get_singleton()->get("rendering/quality/driver/fallback_to_gles2");
         String gles_version = min_gles3 ? "0x00030000" : "0x00020000";
-        manifest_text = manifest_text.replace("GLES_VERSION_HERE", gles_version);
+        manifest_text = manifest_text.replace("*GLES_VERSION*", gles_version);
 
 		int orientation = p_preset->get("screen/orientation"); //TODO: why is this an int?
-		manifest_text = manifest_text.replace("SCREEN_ORIENTATION_HERE", itos(orientation));
+		manifest_text = manifest_text.replace("*SCREEN_ORIENTATION*", itos(orientation));
 
 
         String screen_support_small = p_preset->get("screen/support_small") ? "true" : "false";
         String screen_support_normal = p_preset->get("screen/support_normal") ? "true" : "false";
         String screen_support_large = p_preset->get("screen/support_large") ? "true" : "false";
         String screen_support_xlarge = p_preset->get("screen/support_xlarge") ? "true" : "false";
-		manifest_text = manifest_text.replace("SMALL_SCREENS_HERE", screen_support_small);
-		manifest_text = manifest_text.replace("NORMAL_SCREENS_HERE", screen_support_normal);
-		manifest_text = manifest_text.replace("LARGE_SCREENS_HERE", screen_support_large);
-		manifest_text = manifest_text.replace("X_LARGE_SCREENS_HERE", screen_support_xlarge);
+		manifest_text = manifest_text.replace("*SMALL_SCREENS*", screen_support_small);
+		manifest_text = manifest_text.replace("*NORMAL_SCREENS*", screen_support_normal);
+		manifest_text = manifest_text.replace("*LARGE_SCREENS*", screen_support_large);
+		manifest_text = manifest_text.replace("*X_LARGE_SCREENS*", screen_support_xlarge);
 
 		Vector<String> perms = _get_permissions(p_preset, p_give_internet);
 		String permission_string;
 		for(int i = 0; i < perms.size(); i++){
 			permission_string.insert(0, "\t<uses-permission android:name=\"" + perms.get(i) + "\"/>\n");
 		}
-		manifest_text = manifest_text.replace("PERMISSIONS_HERE", permission_string);
+		manifest_text = manifest_text.replace("*PERMISSIONS*", permission_string);
 
         int xr_mode_index = p_preset->get("xr_features/xr_mode");
         bool focus_awareness = p_preset->get("xr_features/focus_awareness");
