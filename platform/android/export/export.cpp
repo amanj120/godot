@@ -238,9 +238,7 @@ const String ANDROID_MANIFEST_TEXT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 									 "        <!-- Do these changes in the export preset. Adding new ones is fine. -->\n"
 									 "\n"
 									 "        <!-- XR mode metadata. This is modified by the exporter based on the selected xr mode. DO NOT CHANGE the values here. -->\n"
-									 "        <meta-data\n" //
-									 "            android:name=\"*XR_MODE_METADATA_NAME*\"\n"
-									 "            android:value=\"*XR_MODE_METADATA_VALUE*\" />\n"
+									 "        *XR_MODE_TAG*\n"
 									 "\n"
 									 "        <!-- Metadata populated at export time and used by Godot to figure out which plugins must be enabled. -->\n"
 									 "        <meta-data\n"
@@ -258,9 +256,7 @@ const String ANDROID_MANIFEST_TEXT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 									 "            tools:ignore=\"UnusedAttribute\" >\n"
 									 "\n"
 									 "            <!-- Focus awareness metadata populated at export time if the user enables it in the 'Xr Features' section. -->\n"
-									 "            <meta-data\n"
-									 "                android:name=\"com.oculus.vr.focusaware\"\n"
-									 "                android:value=\"*FOCUS_AWARE_VALUE*\"/>\n"
+									 "            *FOCUS_AWARENESS_TAG*\n"
 									 "\n"
 									 "            <intent-filter>\n"
 									 "                <action android:name=\"android.intent.action.MAIN\" />\n"
@@ -960,9 +956,11 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		String feature_string;
 
 		if (xr_mode_index == 1 /* XRMode.OVR */) {
-			manifest_text = manifest_text.replace("*XR_MODE_METADATA_NAME*", "com.samsung.android.vr.application.mode");
-			manifest_text = manifest_text.replace("*XR_MODE_METADATA_VALUE*", "vr_only");
-			manifest_text = manifest_text.replace("*FOCUS_AWARE_VALUE*", focus_awareness);
+
+			String xr_text = "<meta-data android:name=\"com.samsung.android.vr.application.mode\" android:value=\"vr_only\" />\n";
+			manifest_text = manifest_text.replace("*XR_MODE_TAG*", xr_text);
+			String fa_text = "<meta-data android:name=\"com.oculus.vr.focusaware\" android:value=\"" + focus_awareness + "\"/>\n";
+			manifest_text = manifest_text.replace("*FOCUS_AWARENESS_TAG*", fa_text);
 
 			int dof_index = p_preset->get("xr_features/degrees_of_freedom"); // 0: none, 1: 3dof and 6dof, 2: 6dof
 
