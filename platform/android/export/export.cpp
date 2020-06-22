@@ -925,7 +925,7 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		String gles_version = min_gles3 ? "0x00030000" : "0x00020000";
 		manifest_text = manifest_text.replace("*GLES_VERSION*", gles_version);
 
-		int orientation = p_preset->get("screen/orientation"); //TODO: why is this an int?
+		int orientation = p_preset->get("screen/orientation");
 		String orientation_name;
 		if (orientation == 0) {
 			orientation_name = "landscape";
