@@ -207,7 +207,7 @@ const String ANDROID_MANIFEST_TEXT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 									 "    android:versionName=\"*VERSION_NAME*\"\n"
 									 "    android:installLocation=\"auto\" >\n"
 									 "\n"
-									 "<instrumentation android:targetPackage=\"*INSTR_PACKAGE_NAME*\"/>\n"
+									 "<instrumentation android:targetPackage=\"org.godotengine.godot\"/>\n"
 									 "\n"
 									 "    <!-- Adding custom text to the manifest is fine, but do it outside the custom USER and APPLICATION BEGIN/END comments, -->\n"
 									 "    <!-- as that gets rewritten. -->\n"
@@ -248,7 +248,7 @@ const String ANDROID_MANIFEST_TEXT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 									 "            android:value=\"*PLUGINS_VALUES*\"/>\n"
 									 "\n"
 									 "        <activity\n"
-									 "            android:name=\".GodotApp\"\n"
+									 "            android:name=\"com.godot.game.GodotApp\"\n"
 									 "            android:label=\"@string/godot_project_name_string\"\n"
 									 "            android:theme=\"@android:style/Theme.Black.NoTitleBar.Fullscreen\"\n"
 									 "            android:launchMode=\"singleTask\"\n"
@@ -914,7 +914,6 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 
 		String package_name = p_preset->get("package/unique_name");
 		manifest_text = manifest_text.replace("*PACKAGE_NAME*", get_package_name(package_name));
-		manifest_text = manifest_text.replace("*INSTR_PACKAGE_NAME*", get_package_name(package_name));
 
 		String version_name = p_preset->get("version/name");
 		int version_code = p_preset->get("version/code");
