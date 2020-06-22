@@ -909,7 +909,6 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 	}
 
 	Error _fix_manifest_plaintext(const Ref<EditorExportPreset> &p_preset, String &manifest_path, bool p_give_internet) {
-		//TODO: replicate the functionality of _fix_manifest by editing the plaintext AndroidManifest.xml file
 		String manifest_text = ANDROID_MANIFEST_TEXT;
 
 		String package_name = p_preset->get("package/unique_name");
