@@ -2678,12 +2678,6 @@ public:
 			return ERR_CANT_CREATE;
 		}
 
-		//		String apk_relative_path = p_path.replace(ProjectSettings::get_singleton()->get_resource_path(), "");
-		//		//the default output path is res://android/build/build/output/<debug|release>/apk/android_<debug|release>.apk, hence the ../../../../../..
-		//		String output_apk_path = apk_relative_path.insert(0, "../../../../../..");
-		//		print_line(output_apk_path);
-
-		//		TODO: find a better way to change the output directory and filename
 		_update_custom_build_project(); //alters the build.gradle, android manifest, etc.
 
 		_copy_icons_to_gradle_project(p_preset);
@@ -2747,9 +2741,6 @@ public:
 		String build_type = (p_debug ? "Debug" : "Release");
 		build_type = build_type.insert(0, (aab ? "bundle" : "assemble"));
 		cmdline.push_back(build_type);
-
-		print_line("p_path: " + p_path);
-		print_line("resource path: " + ProjectSettings::get_singleton()->get_resource_path());
 
 		cmdline.push_back("-Pexport_package_name=" + package_name); // argument to specify the package name.
 		cmdline.push_back("-Pplugins_local_binaries=" + local_plugins_binaries); // argument to specify the list of plugins local dependencies.
