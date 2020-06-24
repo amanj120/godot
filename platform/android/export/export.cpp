@@ -1754,6 +1754,8 @@ public:
 		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "custom_template/debug", PROPERTY_HINT_GLOBAL_FILE, "*.apk"), ""));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "custom_template/release", PROPERTY_HINT_GLOBAL_FILE, "*.apk"), ""));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "custom_template/use_custom_build"), false));
+		r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "custom_template/export_as_bundle"), false));
+		r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "custom_template/setup_gradle_project_only"), false));
 
 		Vector<PluginConfig> plugins_configs = get_plugins();
 		for (int i = 0; i < plugins_configs.size(); i++) {
@@ -2223,7 +2225,7 @@ public:
 		return list;
 	}
 
-	void _update_custom_build_project(const String &output_apk_path) {
+	void _update_custom_build_project() {
 
 		DirAccessRef da = DirAccess::open("res://android");
 
@@ -2411,9 +2413,6 @@ public:
 					}
 				}
 			}
-
-			//edit output path
-			new_file = new_file.replace("android_${variant.name}.apk", output_apk_path);
 
 			FileAccessRef f = FileAccess::open("res://android/build/build.gradle", FileAccess::WRITE);
 			f->store_string(new_file);
@@ -2678,11 +2677,15 @@ public:
 			EditorNode::add_io_error("The output apk must be saved within your godot project directory\n");
 			return ERR_CANT_CREATE;
 		}
-		String apk_relative_path = p_path.replace(ProjectSettings::get_singleton()->get_resource_path(), "");
-		//the default output path is res://android/build/build/output/<debug|release>/apk/android_<debug|release>.apk, hence the ../../../../../..
-		String output_apk_path = apk_relative_path.replace(".apk", "").insert(0, "../../../../../..") + "_${variant.name}.apk";
 
-		_update_custom_build_project(output_apk_path); //alters the build.gradle, android manifest, etc.
+		//		String apk_relative_path = p_path.replace(ProjectSettings::get_singleton()->get_resource_path(), "");
+		//		//the default output path is res://android/build/build/output/<debug|release>/apk/android_<debug|release>.apk, hence the ../../../../../..
+		//		String output_apk_path = apk_relative_path.insert(0, "../../../../../..");
+		//		print_line(output_apk_path);
+
+		//		TODO: find a better way to change the output directory and filename
+		_update_custom_build_project(); //alters the build.gradle, android manifest, etc.
+
 		_copy_icons_to_gradle_project(p_preset);
 		Error copy_value_xml_err = _copy_value_xml_files(p_preset, p_debug);
 		if (copy_value_xml_err != OK) {
@@ -2699,8 +2702,7 @@ public:
 		}
 
 		APKExportData ed;
-		err = export_project_files(p_preset, rename_and_store_file_in_gradle_project, &ed,
-				store_so_file_in_gradle_project);
+		err = export_project_files(p_preset, rename_and_store_file_in_gradle_project, &ed, store_so_file_in_gradle_project);
 
 		if (err != OK) {
 			EditorNode::add_io_error("Could not export project files to gradle project\n");
@@ -2710,12 +2712,18 @@ public:
 		OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
 
 		String build_command;
+		String move_command;
+		String copy_command;
 		String package_name = get_package_name(p_preset->get("package/unique_name"));
 
 #ifdef WINDOWS_ENABLED
 		build_command = "gradlew.bat";
+		move_command = "move";
+		copy_command = "copy";
 #else
 		build_command = "gradlew";
+		move_command = "mv";
+		copy_command = "cp";
 #endif
 
 		String build_path = ProjectSettings::get_singleton()->get_resource_path().plus_file("android/build");
@@ -2732,7 +2740,17 @@ public:
 		if (clean_build_required) {
 			cmdline.push_back("clean");
 		}
-		cmdline.push_back("build");
+
+		bool aab = bool(p_preset->get("custom_template/export_as_bundle"));
+
+		//TODO: is assemble the correct gradle task for building an apk?
+		String build_type = (p_debug ? "Debug" : "Release");
+		build_type = build_type.insert(0, (aab ? "bundle" : "assemble"));
+		cmdline.push_back(build_type);
+
+		print_line("p_path: " + p_path);
+		print_line("resource path: " + ProjectSettings::get_singleton()->get_resource_path());
+
 		cmdline.push_back("-Pexport_package_name=" + package_name); // argument to specify the package name.
 		cmdline.push_back("-Pplugins_local_binaries=" + local_plugins_binaries); // argument to specify the list of plugins local dependencies.
 		cmdline.push_back("-Pplugins_remote_binaries=" + remote_plugins_binaries); // argument to specify the list of plugins remote dependencies.
@@ -2747,6 +2765,25 @@ public:
 			return ERR_CANT_CREATE;
 		}
 
+		List<String> mv_args;
+		String output_path;
+		if (p_debug) {
+			if (aab) {
+				output_path = "android/build/build/outputs/bundle/debug/build_debug.aab";
+			} else {
+				output_path = "android/build/build/outputs/apk/debug/android_debug.apk";
+			}
+		} else {
+			if (aab) {
+				output_path = "android/build/build/outputs/bundle/release/build_release.aab";
+			} else {
+				output_path = "android/build/build/outputs/apk/release/android_release.apk";
+			}
+		}
+
+		mv_args.push_back(ProjectSettings::get_singleton()->get_resource_path().plus_file(output_path));
+		mv_args.push_back(p_path.replace("apk", (aab ? "aab" : "apk")));
+		int result2 = EditorNode::get_singleton()->execute_and_show_output(TTR("Moving output"), copy_command, mv_args);
 		return OK;
 	}
 
