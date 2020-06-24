@@ -2679,7 +2679,6 @@ public:
 		}
 
 		_update_custom_build_project(); //alters the build.gradle, android manifest, etc.
-
 		_copy_icons_to_gradle_project(p_preset);
 		Error copy_value_xml_err = _copy_value_xml_files(p_preset, p_debug);
 		if (copy_value_xml_err != OK) {
@@ -2736,7 +2735,6 @@ public:
 		}
 
 		bool aab = bool(p_preset->get("custom_template/export_as_bundle"));
-
 		//TODO: is assemble the correct gradle task for building an apk?
 		String build_type = (p_debug ? "Debug" : "Release");
 		build_type = build_type.insert(0, (aab ? "bundle" : "assemble"));
