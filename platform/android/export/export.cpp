@@ -2779,13 +2779,13 @@ public:
 
 		bool export_bundle = bool(p_preset->get("custom_template/export_as_bundle"));
 		if (!export_bundle) { //handles creating the _cl_ file
-			Vector<uint8_t> clf;
-			err = get_command_line_file(p_preset, p_path, p_flags, &clf);
+			Vector<uint8_t> command_line_file;
+			err = get_command_line_file(p_preset, p_path, p_flags, &command_line_file);
 			if (err != OK) {
 				EditorNode::add_io_error("Could not write expansion package file");
 				return err;
 			}
-			store_file_in_gradle_project("res://android/build/assets/_cl_", clf, 0);
+			store_file_in_gradle_project("res://android/build/assets/_cl_", command_line_file, 0);
 		}
 
 		OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
@@ -3074,8 +3074,8 @@ public:
 			err = export_project_files(p_preset, save_apk_file, &ed, save_apk_so);
 		}
 
-		Vector<uint8_t> clf;
-		err = get_command_line_file(p_preset, p_path, p_flags, &clf);
+		Vector<uint8_t> command_line_file;
+		err = get_command_line_file(p_preset, p_path, p_flags, &command_line_file);
 
 		if (err != OK) {
 			unzClose(pkg);
@@ -3096,7 +3096,7 @@ public:
 				0, // No compress (little size gain and potentially slower startup)
 				Z_DEFAULT_COMPRESSION);
 
-		zipWriteInFileInZip(unaligned_apk, clf.ptr(), clf.size());
+		zipWriteInFileInZip(unaligned_apk, command_line_file.ptr(), command_line_file.size());
 		zipCloseFileInZip(unaligned_apk);
 
 		zipClose(unaligned_apk, NULL);
