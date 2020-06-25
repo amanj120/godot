@@ -2655,9 +2655,9 @@ public:
 		}
 	}
 
-	Error get_cl(const Ref<EditorExportPreset> &p_preset, const String &p_path, int p_flags, Vector<uint8_t> *clf) {
+	Error get_command_line_file(const Ref<EditorExportPreset> &p_preset, const String &p_path, int p_flags, Vector<uint8_t> *command_line_file) {
 
-		bool use_32_fb = p_preset->get("graphics/32_bits_framebuffer");
+		bool use_32_bit_framebuffer = p_preset->get("graphics/32_bits_framebuffer");
 		bool immersive = p_preset->get("screen/immersive_mode");
 		bool debug_opengl = p_preset->get("screen/opengl_debug");
 		String cmdline = p_preset->get("command_line/extra_args");
@@ -2665,68 +2665,66 @@ public:
 		String version_name = p_preset->get("version/name");
 		String package_name = p_preset->get("package/unique_name");
 
-		Vector<String> cl = cmdline.strip_edges().split(" ");
-		for (int i = 0; i < cl.size(); i++) {
-			if (cl[i].strip_edges().length() == 0) {
-				cl.remove(i);
+		Vector<String> command_line_strings = cmdline.strip_edges().split(" ");
+		for (int i = 0; i < command_line_strings.size(); i++) {
+			if (command_line_strings[i].strip_edges().length() == 0) {
+				command_line_strings.remove(i);
 				i--;
 			}
 		}
 
-		gen_export_flags(cl, p_flags);
+		gen_export_flags(command_line_strings, p_flags);
 
 		bool apk_expansion = p_preset->get("apk_expansion/enable");
-		String apk_expansion_pkey = p_preset->get("apk_expansion/public_key");
 		if (apk_expansion) {
-
-			String apkfname = "main." + itos(version_code) + "." + get_package_name(package_name) + ".obb";
-			String fullpath = p_path.get_base_dir().plus_file(apkfname);
+			String apk_file_name = "main." + itos(version_code) + "." + get_package_name(package_name) + ".obb";
+			String fullpath = p_path.get_base_dir().plus_file(apk_file_name);
+			String apk_expansion_public_key = p_preset->get("apk_expansion/public_key");
 			Error err = save_pack(p_preset, fullpath);
 
 			if (err != OK) {
-				EditorNode::add_io_error("Could not write expansion package file: " + apkfname);
+				EditorNode::add_io_error("Could not write expansion package file: " + apk_file_name);
 				return err;
 			}
 
-			cl.push_back("--use_apk_expansion");
-			cl.push_back("--apk_expansion_md5");
-			cl.push_back(FileAccess::get_md5(fullpath));
-			cl.push_back("--apk_expansion_key");
-			cl.push_back(apk_expansion_pkey.strip_edges());
+			command_line_strings.push_back("--use_apk_expansion");
+			command_line_strings.push_back("--apk_expansion_md5");
+			command_line_strings.push_back(FileAccess::get_md5(fullpath));
+			command_line_strings.push_back("--apk_expansion_key");
+			command_line_strings.push_back(apk_expansion_public_key.strip_edges());
 		}
 
 		int xr_mode_index = p_preset->get("xr_features/xr_mode");
 		if (xr_mode_index == 1 /* XRMode.OVR */) {
-			cl.push_back("--xr_mode_ovr");
+			command_line_strings.push_back("--xr_mode_ovr");
 		} else {
 			// XRMode.REGULAR is the default.
-			cl.push_back("--xr_mode_regular");
+			command_line_strings.push_back("--xr_mode_regular");
 		}
 
-		if (use_32_fb)
-			cl.push_back("--use_depth_32");
+		if (use_32_bit_framebuffer)
+			command_line_strings.push_back("--use_depth_32");
 
 		if (immersive)
-			cl.push_back("--use_immersive");
+			command_line_strings.push_back("--use_immersive");
 
 		if (debug_opengl)
-			cl.push_back("--debug_opengl");
+			command_line_strings.push_back("--debug_opengl");
 
-		if (cl.size()) {
+		if (command_line_strings.size()) {
 			//add comandline
-			clf->resize(4);
-			encode_uint32(cl.size(), &clf->write[0]);
-			for (int i = 0; i < cl.size(); i++) {
-
-				print_line(itos(i) + " param: " + cl[i]);
-				CharString txt = cl[i].utf8();
-				int base = clf->size();
-				int length = txt.length();
-				if (!length)
+			command_line_file->resize(4);
+			encode_uint32(command_line_strings.size(), &command_line_file->write[0]);
+			for (int i = 0; i < command_line_strings.size(); i++) {
+				print_line(itos(i) + " param: " + command_line_strings[i]);
+				CharString command_line_argument = command_line_strings[i].utf8();
+				int base = command_line_file->size();
+				int length = command_line_argument.length();
+				if (length == 0)
 					continue;
-				clf->resize(base + 4 + length);
-				encode_uint32(length, &clf.write[base]);
-				copymem(&clf->write[base + 4], txt.ptr(), length);
+				command_line_file->resize(base + 4 + length);
+				encode_uint32(length, &command_line_file->write[base]);
+				copymem(&command_line_file->write[base + 4], command_line_argument.ptr(), length);
 			}
 		}
 		return OK;
@@ -2779,10 +2777,10 @@ public:
 			return err;
 		}
 
-		bool aab = bool(p_preset->get("custom_template/export_as_bundle"));
-		if (!aab) { //handles creating the _cl_ file
+		bool export_bundle = bool(p_preset->get("custom_template/export_as_bundle"));
+		if (!export_bundle) { //handles creating the _cl_ file
 			Vector<uint8_t> clf;
-			err = get_cl(p_preset, p_path, p_flags, &clf);
+			err = get_command_line_file(p_preset, p_path, p_flags, &clf);
 			if (err != OK) {
 				EditorNode::add_io_error("Could not write expansion package file");
 				return err;
@@ -2823,7 +2821,7 @@ public:
 
 		//TODO: is assemble the correct gradle task for building an apk?
 		String build_type = (p_debug ? "Debug" : "Release");
-		build_type = build_type.insert(0, (aab ? "bundle" : "assemble"));
+		build_type = build_type.insert(0, (export_bundle ? "bundle" : "assemble"));
 		cmdline.push_back(build_type);
 
 		cmdline.push_back("-Pexport_package_name=" + package_name); // argument to specify the package name.
@@ -2840,25 +2838,30 @@ public:
 			return ERR_CANT_CREATE;
 		}
 
-		List<String> mv_args;
+		List<String> copy_args;
 		String output_path;
-		if (p_debug) {
-			if (aab) {
+		if (export_bundle) {
+			if (p_debug) {
 				output_path = "android/build/build/outputs/bundle/debug/build_debug.aab";
 			} else {
-				output_path = "android/build/build/outputs/apk/debug/android_debug.apk";
+				output_path = "android/build/build/outputs/bundle/release/build_release.aab";
 			}
 		} else {
-			if (aab) {
-				output_path = "android/build/build/outputs/bundle/release/build_release.aab";
+			if (p_debug) {
+				output_path = "android/build/build/outputs/apk/debug/android_debug.apk";
 			} else {
 				output_path = "android/build/build/outputs/apk/release/android_release.apk";
 			}
 		}
 
-		mv_args.push_back(ProjectSettings::get_singleton()->get_resource_path().plus_file(output_path));
-		mv_args.push_back(p_path.replace("apk", (aab ? "aab" : "apk")));
-		int result2 = EditorNode::get_singleton()->execute_and_show_output(TTR("Moving output"), copy_command, mv_args);
+		copy_args.push_back(ProjectSettings::get_singleton()->get_resource_path().plus_file(output_path));
+		copy_args.push_back(p_path.replace("apk", (export_bundle ? "aab" : "apk")));
+		int copy_result = EditorNode::get_singleton()->execute_and_show_output(TTR("Moving output"), copy_command, copy_args);
+		if (copy_result != 0) {
+			EditorNode::get_singleton()->show_warning(TTR("Unable to copy and rename export file, check gradle project directory for outputs."));
+			return ERR_CANT_CREATE;
+		}
+
 		return OK;
 	}
 
@@ -2917,17 +2920,10 @@ public:
 
 		zipFile unaligned_apk = zipOpen2(tmp_unaligned_path.utf8().get_data(), APPEND_STATUS_CREATE, NULL, &io2);
 
-		bool use_32_fb = p_preset->get("graphics/32_bits_framebuffer");
-		bool immersive = p_preset->get("screen/immersive_mode");
-		bool debug_opengl = p_preset->get("screen/opengl_debug");
-
 		bool _signed = p_preset->get("package/signed");
-
-		bool apk_expansion = p_preset->get("apk_expansion/enable");
 
 		String cmdline = p_preset->get("command_line/extra_args");
 
-		int version_code = p_preset->get("version/code");
 		String version_name = p_preset->get("version/name");
 		String package_name = p_preset->get("package/unique_name");
 
@@ -3079,7 +3075,7 @@ public:
 		}
 
 		Vector<uint8_t> clf;
-		err = get_cl(p_preset, p_path, p_flags, &clf);
+		err = get_command_line_file(p_preset, p_path, p_flags, &clf);
 
 		if (err != OK) {
 			unzClose(pkg);
