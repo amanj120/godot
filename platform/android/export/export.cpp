@@ -1755,7 +1755,6 @@ public:
 		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "custom_template/release", PROPERTY_HINT_GLOBAL_FILE, "*.apk"), ""));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "custom_template/use_custom_build"), false));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "custom_template/export_as_bundle"), false));
-		r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "custom_template/setup_gradle_project_only"), false));
 
 		Vector<PluginConfig> plugins_configs = get_plugins();
 		for (int i = 0; i < plugins_configs.size(); i++) {
@@ -2226,7 +2225,6 @@ public:
 	}
 
 	void _update_custom_build_project() {
-
 		DirAccessRef da = DirAccess::open("res://android");
 
 		ERR_FAIL_COND_MSG(!da, "Cannot open directory 'res://android'.");
@@ -2236,7 +2234,6 @@ public:
 		da->list_dir_begin();
 		String d = da->get_next();
 		while (d != String()) {
-
 			if (!d.begins_with(".") && d != "build" && da->current_is_dir()) { //a dir and not the build dir
 				//add directories found
 				DirAccessRef ds = DirAccess::open(String("res://android").plus_file(d));
@@ -2544,14 +2541,11 @@ public:
 		int ret = unzGoToFirstFile(pkg);
 
 		while (ret == UNZ_OK) {
-
 			//get filename
 			unz_file_info info;
 			char fname[16384];
 			unzGetCurrentFileInfo(pkg, &info, fname, 16384, NULL, 0, NULL, 0);
-
 			String file = fname;
-
 			Vector<uint8_t> data;
 			data.resize(info.uncompressed_size);
 
@@ -2656,7 +2650,6 @@ public:
 	}
 
 	Error get_command_line_file(const Ref<EditorExportPreset> &p_preset, const String &p_path, int p_flags, Vector<uint8_t> *command_line_file) {
-
 		bool use_32_bit_framebuffer = p_preset->get("graphics/32_bits_framebuffer");
 		bool immersive = p_preset->get("screen/immersive_mode");
 		bool debug_opengl = p_preset->get("screen/opengl_debug");
@@ -2712,7 +2705,6 @@ public:
 			command_line_strings.push_back("--debug_opengl");
 
 		if (command_line_strings.size()) {
-			//add comandline
 			command_line_file->resize(4);
 			encode_uint32(command_line_strings.size(), &command_line_file->write[0]);
 			for (int i = 0; i < command_line_strings.size(); i++) {
@@ -2771,7 +2763,6 @@ public:
 
 		APKExportData ed;
 		err = export_project_files(p_preset, rename_and_store_file_in_gradle_project, &ed, store_so_file_in_gradle_project);
-
 		if (err != OK) {
 			EditorNode::add_io_error("Could not export project files to gradle project\n");
 			return err;
@@ -2791,17 +2782,14 @@ public:
 		OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
 
 		String build_command;
-		String move_command;
 		String copy_command;
 		String package_name = get_package_name(p_preset->get("package/unique_name"));
 
 #ifdef WINDOWS_ENABLED
 		build_command = "gradlew.bat";
-		move_command = "move";
 		copy_command = "copy";
 #else
 		build_command = "gradlew";
-		move_command = "mv";
 		copy_command = "cp";
 #endif
 
@@ -2855,7 +2843,7 @@ public:
 		}
 
 		copy_args.push_back(ProjectSettings::get_singleton()->get_resource_path().plus_file(output_path));
-		copy_args.push_back(p_path.replace("apk", (export_bundle ? "aab" : "apk")));
+		copy_args.push_back(export_bundle ? p_path.replace(".apk", ".aab") : p_path);
 		int copy_result = EditorNode::get_singleton()->execute_and_show_output(TTR("Moving output"), copy_command, copy_args);
 		if (copy_result != 0) {
 			EditorNode::get_singleton()->show_warning(TTR("Unable to copy and rename export file, check gradle project directory for outputs."));
