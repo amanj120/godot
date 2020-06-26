@@ -744,56 +744,56 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
-    static Error store_file_in_gradle_project(const String &p_path, const Vector<uint8_t> &p_data, int compression_method = Z_DEFLATED) {
-        //stores p_data into a file at p_path
-        size_t dir_point = p_path.rfind("/");
-        String dir = p_path.substr(0, dir_point); //gets path of file without filename
-        if (!DirAccess::exists(dir)) {
-            DirAccess *filesystem_da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
-            filesystem_da->make_dir_recursive(dir);
-            memdelete(filesystem_da);
-        }
-        FileAccess *fa = FileAccess::open(p_path, FileAccess::WRITE);
-        fa->store_buffer(p_data.ptr(), p_data.size());
-        ERR_FAIL_COND_V_MSG(!fa, ERR_CANT_CREATE, "Cannot create file '" + p_path + "'.");
-        memdelete(fa);
-        return OK;
-    }
+	static Error store_file_in_gradle_project(const String &p_path, const Vector<uint8_t> &p_data, int compression_method = Z_DEFLATED) {
+		//stores p_data into a file at p_path
+		size_t dir_point = p_path.rfind("/");
+		String dir = p_path.substr(0, dir_point); //gets path of file without filename
+		if (!DirAccess::exists(dir)) {
+			DirAccess *filesystem_da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
+			filesystem_da->make_dir_recursive(dir);
+			memdelete(filesystem_da);
+		}
+		FileAccess *fa = FileAccess::open(p_path, FileAccess::WRITE);
+		fa->store_buffer(p_data.ptr(), p_data.size());
+		ERR_FAIL_COND_V_MSG(!fa, ERR_CANT_CREATE, "Cannot create file '" + p_path + "'.");
+		memdelete(fa);
+		return OK;
+	}
 
-    static Error store_so_file_in_gradle_project(void *p_userdata, const SharedObject &p_so) {
-        if (!p_so.path.get_file().begins_with("lib")) {
-            String err = "Android .so file names must start with \"lib\", but got: " + p_so.path;
-            ERR_PRINTS(err);
-            return FAILED;
-        }
-        Vector<String> abis = get_abis();
-        bool exported = false;
-        for (int i = 0; i < p_so.tags.size(); ++i) {
-            // shared objects can be fat (compatible with multiple ABIs)
-            int abi_index = abis.find(p_so.tags[i]);
-            if (abi_index != -1) {
-                exported = true;
-                String abi = abis[abi_index];
-                String dst_path = String("lib").plus_file(abi).plus_file(p_so.path.get_file());
-                Vector<uint8_t> array = FileAccess::get_file_as_array(p_so.path);
-                Error store_err = store_file_in_gradle_project(dst_path, array);
-                ERR_FAIL_COND_V_MSG(store_err, store_err, "Cannot store in apk file '" + dst_path + "'.");
-            }
-        }
-        if (!exported) {
-            String abis_string = String(" ").join(abis);
-            String err = "Cannot determine ABI for library \"" + p_so.path + "\". One of the supported ABIs must be used as a tag: " + abis_string;
-            ERR_PRINTS(err);
-            return FAILED;
-        }
-        return OK;
-    }
+	static Error store_so_file_in_gradle_project(void *p_userdata, const SharedObject &p_so) {
+		if (!p_so.path.get_file().begins_with("lib")) {
+			String err = "Android .so file names must start with \"lib\", but got: " + p_so.path;
+			ERR_PRINTS(err);
+			return FAILED;
+		}
+		Vector<String> abis = get_abis();
+		bool exported = false;
+		for (int i = 0; i < p_so.tags.size(); ++i) {
+			// shared objects can be fat (compatible with multiple ABIs)
+			int abi_index = abis.find(p_so.tags[i]);
+			if (abi_index != -1) {
+				exported = true;
+				String abi = abis[abi_index];
+				String dst_path = String("lib").plus_file(abi).plus_file(p_so.path.get_file());
+				Vector<uint8_t> array = FileAccess::get_file_as_array(p_so.path);
+				Error store_err = store_file_in_gradle_project(dst_path, array);
+				ERR_FAIL_COND_V_MSG(store_err, store_err, "Cannot store in apk file '" + dst_path + "'.");
+			}
+		}
+		if (!exported) {
+			String abis_string = String(" ").join(abis);
+			String err = "Cannot determine ABI for library \"" + p_so.path + "\". One of the supported ABIs must be used as a tag: " + abis_string;
+			ERR_PRINTS(err);
+			return FAILED;
+		}
+		return OK;
+	}
 
-    static Error rename_and_store_file_in_gradle_project(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total) {
-        String dst_path = p_path.replace_first("res://", "res://android/build/assets/");
-        store_file_in_gradle_project(dst_path, p_data, 0);
-        return OK;
-    }
+	static Error rename_and_store_file_in_gradle_project(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total) {
+		String dst_path = p_path.replace_first("res://", "res://android/build/assets/");
+		store_file_in_gradle_project(dst_path, p_data, 0);
+		return OK;
+	}
 
 	void _fix_manifest(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet) {
 
