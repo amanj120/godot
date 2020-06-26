@@ -1506,6 +1506,86 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		}
 	}
 
+	Vector<uint8_t> _resize_launcher_icon(const Ref<Image> &p_source_image, const LauncherIcon p_icon) {
+		Ref<Image> working_image = p_source_image;
+
+		if (p_source_image->get_width() != p_icon.dimensions || p_source_image->get_height() != p_icon.dimensions) {
+			working_image = p_source_image->duplicate();
+			working_image->resize(p_icon.dimensions, p_icon.dimensions, Image::Interpolation::INTERPOLATE_LANCZOS);
+		}
+
+		PoolVector<uint8_t> png_buffer;
+		Error err = PNGDriverCommon::image_to_png(working_image, png_buffer);
+		if (err == OK) {
+			Vector<uint8_t> ret;
+			ret.resize(png_buffer.size());
+			memcpy(ret.ptrw(), png_buffer.read().ptr(), ret.size());
+			return ret;
+		} else {
+			String err_str = String("Failed to convert resized icon (") + p_icon.export_path + ") to png.";
+			WARN_PRINT(err_str.utf8().get_data());
+			return Vector<uint8_t>();
+		}
+	}
+
+	void _copy_icons_to_gradle_project(const Ref<EditorExportPreset> &p_preset) {
+		String project_icon_path = ProjectSettings::get_singleton()->get("application/config/icon");
+		// Prepare images to be resized for the icons. If some image ends up being uninitialized, the default image from the export template will be used.
+		Ref<Image> launcher_icon_image;
+		Ref<Image> launcher_adaptive_icon_foreground_image;
+		Ref<Image> launcher_adaptive_icon_background_image;
+
+		launcher_icon_image.instance();
+		launcher_adaptive_icon_foreground_image.instance();
+		launcher_adaptive_icon_background_image.instance();
+
+		// Regular icon: user selection -> project icon -> default.
+		String path = static_cast<String>(p_preset->get(launcher_icon_option)).strip_edges();
+		if (path.empty() || ImageLoader::load_image(path, launcher_icon_image) != OK) {
+			ImageLoader::load_image(project_icon_path, launcher_icon_image);
+		}
+
+		// Adaptive foreground: user selection -> regular icon (user selection -> project icon -> default).
+		path = static_cast<String>(p_preset->get(launcher_adaptive_icon_foreground_option)).strip_edges();
+		if (path.empty() || ImageLoader::load_image(path, launcher_adaptive_icon_foreground_image) != OK) {
+			launcher_adaptive_icon_foreground_image = launcher_icon_image;
+		}
+
+		// Adaptive background: user selection -> default.
+		path = static_cast<String>(p_preset->get(launcher_adaptive_icon_background_option)).strip_edges();
+		if (!path.empty()) {
+			ImageLoader::load_image(path, launcher_adaptive_icon_background_image);
+		}
+
+		for (int i = 0; i < icon_densities_count; ++i) {
+			//void _process_launcher_icons(const String &p_processing_file_name, const Ref<Image> &p_source_image, const LauncherIcon p_icon, Vector<uint8_t> &p_data)
+			if (launcher_icon_image.is_valid() && !launcher_icon_image->empty()) {
+				Vector<uint8_t> data = _resize_launcher_icon(launcher_icon_image, launcher_icons[i]);
+				String img_path = launcher_icons[i].export_path;
+				img_path = img_path.insert(0, "res://android/build/");
+				store_file_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
+			}
+
+			if (launcher_adaptive_icon_foreground_image.is_valid() && !launcher_adaptive_icon_foreground_image->empty()) {
+				Vector<uint8_t> data = _resize_launcher_icon(
+						launcher_adaptive_icon_foreground_image,
+						launcher_adaptive_icon_foregrounds[i]);
+				String img_path = launcher_adaptive_icon_foregrounds[i].export_path;
+				img_path = img_path.insert(0, "res://android/build/");
+				store_file_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
+			}
+
+			if (launcher_adaptive_icon_background_image.is_valid() && !launcher_adaptive_icon_background_image->empty()) {
+				Vector<uint8_t> data = _resize_launcher_icon(
+						launcher_adaptive_icon_background_image,
+						launcher_adaptive_icon_backgrounds[i]);
+				String img_path = launcher_adaptive_icon_backgrounds[i].export_path;
+				img_path = img_path.insert(0, "res://android/build/");
+				store_file_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
+			}
+		}
+	}
+
 	static Vector<String> get_enabled_abis(const Ref<EditorExportPreset> &p_preset) {
 		Vector<String> abis = get_abis();
 		Vector<String> enabled_abis;
