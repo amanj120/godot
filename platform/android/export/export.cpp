@@ -1007,10 +1007,6 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 								feature_names.push_back("oculus.software.handtracking");
 								feature_required_list.push_back(hand_tracking_index == 2);
 								feature_versions.push_back(-1); // no version attribute should be added.
-
-								if (perms.find("com.oculus.permission.HAND_TRACKING") == -1) {
-									perms.push_back("com.oculus.permission.HAND_TRACKING");
-								}
 							}
 						}
 
