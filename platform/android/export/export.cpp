@@ -758,22 +758,6 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return enabled_plugins;
 	}
 
-	static Error store_file_in_gradle_project(const String &p_path, const Vector<uint8_t> &p_data, int compression_method = Z_DEFLATED) {
-		//stores p_data into a file at p_path
-		size_t dir_point = p_path.rfind("/");
-		String dir = p_path.substr(0, dir_point); //gets path of file without filename
-		if (!DirAccess::exists(dir)) {
-			DirAccess *filesystem_da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
-			filesystem_da->make_dir_recursive(dir);
-			memdelete(filesystem_da);
-		}
-		FileAccess *fa = FileAccess::open(p_path, FileAccess::WRITE);
-		fa->store_buffer(p_data.ptr(), p_data.size());
-		ERR_FAIL_COND_V_MSG(!fa, ERR_CANT_CREATE, "Cannot create file '" + p_path + "'.");
-		memdelete(fa);
-		return OK;
-	}
-
 	static Error store_in_apk(APKExportData *ed, const String &p_path, const Vector<uint8_t> &p_data, int compression_method = Z_DEFLATED) {
 		zip_fileinfo zipfi = get_zip_fileinfo();
 		zipOpenNewFileInZip(ed->apk,
@@ -790,35 +774,6 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		zipWriteInFileInZip(ed->apk, p_data.ptr(), p_data.size());
 		zipCloseFileInZip(ed->apk);
 
-		return OK;
-	}
-
-	static Error store_so_file_in_gradle_project(void *p_userdata, const SharedObject &p_so) {
-		if (!p_so.path.get_file().begins_with("lib")) {
-			String err = "Android .so file names must start with \"lib\", but got: " + p_so.path;
-			ERR_PRINTS(err);
-			return FAILED;
-		}
-		Vector<String> abis = get_abis();
-		bool exported = false;
-		for (int i = 0; i < p_so.tags.size(); ++i) {
-			// shared objects can be fat (compatible with multiple ABIs)
-			int abi_index = abis.find(p_so.tags[i]);
-			if (abi_index != -1) {
-				exported = true;
-				String abi = abis[abi_index];
-				String dst_path = String("lib").plus_file(abi).plus_file(p_so.path.get_file());
-				Vector<uint8_t> array = FileAccess::get_file_as_array(p_so.path);
-				Error store_err = store_file_in_gradle_project(dst_path, array);
-				ERR_FAIL_COND_V_MSG(store_err, store_err, "Cannot store in apk file '" + dst_path + "'.");
-			}
-		}
-		if (!exported) {
-			String abis_string = String(" ").join(abis);
-			String err = "Cannot determine ABI for library \"" + p_so.path + "\". One of the supported ABIs must be used as a tag: " + abis_string;
-			ERR_PRINTS(err);
-			return FAILED;
-		}
 		return OK;
 	}
 
@@ -852,12 +807,6 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
-	static Error rename_and_store_file_in_gradle_project(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total) {
-		String dst_path = p_path.replace_first("res://", "res://android/build/assets/");
-		store_file_in_gradle_project(dst_path, p_data, 0);
-		return OK;
-	}
-
 	static Error save_apk_file(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total) {
 		APKExportData *ed = (APKExportData *)p_userdata;
 		String dst_path = p_path.replace_first("res://", "assets/");
@@ -867,6 +816,33 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 	}
 
 	static Error ignore_apk_file(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total) {
+		return OK;
+	}
+
+	//Needs to match the method parameters of EditorExportSaveSharedObject
+	static Error ignore_so_file(void *p_userdata, const SharedObject &p_so) {
+		return OK;
+	}
+
+	//Multipurpose method used for storing files: writes p_data into a file at p_path, making directories if necessary
+	static Error store_file_at_path(const String &p_path, const Vector<uint8_t> &p_data, int compression_method = Z_DEFLATED) {
+		String dir = p_path.get_base_dir();
+		if (!DirAccess::exists(dir)) {
+			DirAccess *filesystem_da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
+			filesystem_da->make_dir_recursive(dir);
+			memdelete(filesystem_da);
+		}
+		FileAccess *fa = FileAccess::open(p_path, FileAccess::WRITE);
+		fa->store_buffer(p_data.ptr(), p_data.size());
+		ERR_FAIL_COND_V_MSG(!fa, ERR_CANT_CREATE, "Cannot create file '" + p_path + "'.");
+		memdelete(fa);
+		return OK;
+	}
+
+	//Needs to match the method parameters of EditorExportSaveFunction
+	static Error rename_and_store_file_in_gradle_project(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total) {
+		String dst_path = p_path.replace_first("res://", "res://android/build/assets/");
+		store_file_at_path(dst_path, p_data, 0);
 		return OK;
 	}
 
@@ -2557,7 +2533,7 @@ public:
 			//write
 			if (file.begins_with("res/values") && file.ends_with(".xml")) {
 				String dst_path = file.insert(0, "res://android/build/");
-				Error err = store_file_in_gradle_project(dst_path, data);
+				Error err = store_file_at_path(dst_path, data);
 				if (err != OK) {
 					EditorNode::add_io_error("Could not store " + dst_path + "\n");
 					unzClose(pkg);
@@ -2628,7 +2604,7 @@ public:
 				Vector<uint8_t> data = _resize_launcher_icon(launcher_icon_image, launcher_icons[i]);
 				String img_path = launcher_icons[i].export_path;
 				img_path = img_path.insert(0, "res://android/build/");
-				store_file_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
+				store_file_at_path(img_path, data, Z_NO_COMPRESSION);
 			}
 			if (launcher_adaptive_icon_foreground_image.is_valid() && !launcher_adaptive_icon_foreground_image->empty()) {
 				Vector<uint8_t> data = _resize_launcher_icon(
@@ -2636,7 +2612,7 @@ public:
 						launcher_adaptive_icon_foregrounds[i]);
 				String img_path = launcher_adaptive_icon_foregrounds[i].export_path;
 				img_path = img_path.insert(0, "res://android/build/");
-				store_file_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
+				store_file_at_path(img_path, data, Z_NO_COMPRESSION);
 			}
 			if (launcher_adaptive_icon_background_image.is_valid() && !launcher_adaptive_icon_background_image->empty()) {
 				Vector<uint8_t> data = _resize_launcher_icon(
@@ -2644,7 +2620,7 @@ public:
 						launcher_adaptive_icon_backgrounds[i]);
 				String img_path = launcher_adaptive_icon_backgrounds[i].export_path;
 				img_path = img_path.insert(0, "res://android/build/");
-				store_file_in_gradle_project(img_path, data, Z_NO_COMPRESSION);
+				store_file_at_path(img_path, data, Z_NO_COMPRESSION);
 			}
 		}
 	}
@@ -2762,7 +2738,7 @@ public:
 		}
 
 		APKExportData ed;
-		err = export_project_files(p_preset, rename_and_store_file_in_gradle_project, &ed, store_so_file_in_gradle_project);
+		err = export_project_files(p_preset, rename_and_store_file_in_gradle_project, &ed, ignore_so_file);
 		if (err != OK) {
 			EditorNode::add_io_error("Could not export project files to gradle project\n");
 			return err;
@@ -2776,7 +2752,7 @@ public:
 				EditorNode::add_io_error("Could not write expansion package file");
 				return err;
 			}
-			store_file_in_gradle_project("res://android/build/assets/_cl_", command_line_file, 0);
+			store_file_at_path("res://android/build/assets/_cl_", command_line_file, 0);
 		}
 
 		OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
