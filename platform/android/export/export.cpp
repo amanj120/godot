@@ -748,8 +748,9 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		const char **aperms = android_perms;
 		while (*aperms) {
 			bool enabled = p_preset->get("permissions/" + String(*aperms).to_lower());
-			if (enabled)
+			if (enabled) {
 				perms->push_back("android.permission." + String(*aperms));
+			}
 			aperms++;
 		}
 		PoolStringArray user_perms = p_preset->get("permissions/custom_permissions");
@@ -2278,15 +2279,8 @@ public:
 		return have_plugins_changed || first_build;
 	}
 
-	Error get_command_line_file(const Ref<EditorExportPreset> &p_preset, const String &p_path, int p_flags, Vector<uint8_t> *command_line_file) {
-		bool use_32_bit_framebuffer = p_preset->get("graphics/32_bits_framebuffer");
-		bool immersive = p_preset->get("screen/immersive_mode");
-		bool debug_opengl = p_preset->get("screen/opengl_debug");
+	Error get_command_line_flags(const Ref<EditorExportPreset> &p_preset, const String &p_path, int p_flags, Vector<uint8_t> *command_line_flags) {
 		String cmdline = p_preset->get("command_line/extra_args");
-		int version_code = p_preset->get("version/code");
-		String version_name = p_preset->get("version/name");
-		String package_name = p_preset->get("package/unique_name");
-
 		Vector<String> command_line_strings = cmdline.strip_edges().split(" ");
 		for (int i = 0; i < command_line_strings.size(); i++) {
 			if (command_line_strings[i].strip_edges().length() == 0) {
@@ -2299,6 +2293,8 @@ public:
 
 		bool apk_expansion = p_preset->get("apk_expansion/enable");
 		if (apk_expansion) {
+			int version_code = p_preset->get("version/code");
+			String package_name = p_preset->get("package/unique_name");
 			String apk_file_name = "main." + itos(version_code) + "." + get_package_name(package_name) + ".obb";
 			String fullpath = p_path.get_base_dir().plus_file(apk_file_name);
 			String apk_expansion_public_key = p_preset->get("apk_expansion/public_key");
@@ -2317,35 +2313,40 @@ public:
 		}
 
 		int xr_mode_index = p_preset->get("xr_features/xr_mode");
-		if (xr_mode_index == 1 /* XRMode.OVR */) {
+		if (xr_mode_index == 1) {
 			command_line_strings.push_back("--xr_mode_ovr");
-		} else {
-			// XRMode.REGULAR is the default.
+		} else { // XRMode.REGULAR is the default.
 			command_line_strings.push_back("--xr_mode_regular");
 		}
 
-		if (use_32_bit_framebuffer)
+		bool use_32_bit_framebuffer = p_preset->get("graphics/32_bits_framebuffer");
+		if (use_32_bit_framebuffer) {
 			command_line_strings.push_back("--use_depth_32");
+		}
 
-		if (immersive)
+		bool immersive = p_preset->get("screen/immersive_mode");
+		if (immersive) {
 			command_line_strings.push_back("--use_immersive");
+		}
 
-		if (debug_opengl)
+		bool debug_opengl = p_preset->get("screen/opengl_debug");
+		if (debug_opengl) {
 			command_line_strings.push_back("--debug_opengl");
+		}
 
 		if (command_line_strings.size()) {
-			command_line_file->resize(4);
-			encode_uint32(command_line_strings.size(), &command_line_file->write[0]);
+			command_line_flags->resize(4);
+			encode_uint32(command_line_strings.size(), &command_line_flags->write[0]);
 			for (int i = 0; i < command_line_strings.size(); i++) {
 				print_line(itos(i) + " param: " + command_line_strings[i]);
 				CharString command_line_argument = command_line_strings[i].utf8();
-				int base = command_line_file->size();
+				int base = command_line_flags->size();
 				int length = command_line_argument.length();
 				if (length == 0)
 					continue;
-				command_line_file->resize(base + 4 + length);
-				encode_uint32(length, &command_line_file->write[base]);
-				copymem(&command_line_file->write[base + 4], command_line_argument.ptr(), length);
+				command_line_flags->resize(base + 4 + length);
+				encode_uint32(length, &command_line_flags->write[base]);
+				copymem(&command_line_flags->write[base + 4], command_line_argument.ptr(), length);
 			}
 		}
 		return OK;
@@ -2644,8 +2645,8 @@ public:
 			err = export_project_files(p_preset, save_apk_file, &ed, save_apk_so);
 		}
 
-		Vector<uint8_t> command_line_file;
-		err = get_command_line_file(p_preset, p_path, p_flags, &command_line_file);
+		Vector<uint8_t> command_line_flags;
+		err = get_command_line_flags(p_preset, p_path, p_flags, &command_line_flags);
 
 		if (err != OK) {
 			unzClose(pkg);
@@ -2664,7 +2665,7 @@ public:
 				NULL,
 				0, // No compress (little size gain and potentially slower startup)
 				Z_DEFAULT_COMPRESSION);
-		zipWriteInFileInZip(unaligned_apk, command_line_file.ptr(), command_line_file.size());
+		zipWriteInFileInZip(unaligned_apk, command_line_flags.ptr(), command_line_flags.size());
 		zipCloseFileInZip(unaligned_apk);
 
 		zipClose(unaligned_apk, NULL);
