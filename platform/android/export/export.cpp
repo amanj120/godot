@@ -782,26 +782,25 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 	}
 
 	void _write_tmp_manifest(const Ref<EditorExportPreset> &p_preset, bool p_give_internet) {
-		String manifest_header =
+		String package_name = p_preset->get("package/unique_name");
+		String version_code = itos(p_preset->get("version/code"));
+		String version_name = p_preset->get("version/name");
+		String manifest_header_base =
 				"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
 				"<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
 				"    xmlns:tools=\"http://schemas.android.com/tools\"\n"
-				"    package=\"*PACKAGE_NAME*\"\n"
-				"    android:versionCode=\"*VERSION_CODE*\"\n"
-				"    android:versionName=\"*VERSION_NAME*\"\n"
+				"    package=\"%s\"\n"
+				"    android:versionCode=\"%s\"\n"
+				"    android:versionName=\"%s\"\n"
 				"    android:installLocation=\"auto\" >\n";
-
-		String package_name = p_preset->get("package/unique_name");
-		manifest_header = manifest_header.replace("*PACKAGE_NAME*", get_package_name(package_name));
-		String version_name = p_preset->get("version/name");
-		manifest_header = manifest_header.replace("*VERSION_NAME*", version_name);
-		int version_code = p_preset->get("version/code");
-		manifest_header = manifest_header.replace("*VERSION_CODE*", itos(version_code));
+		String manifest_header = vformat(manifest_header_base, package_name, version_code, version_name);
 
 		bool min_gles3 = ProjectSettings::get_singleton()->get("rendering/quality/driver/driver_name") == "GLES3" &&
 						 !ProjectSettings::get_singleton()->get("rendering/quality/driver/fallback_to_gles2");
-		String gles_version = min_gles3 ? "0x00030000" : "0x00020000";
-		String manifest_gles = "<uses-feature ndroid:glEsVersion=\"" + gles_version + "\"android:required=\"true\" />\n";
+		String manifest_gles = "";
+		if(min_gles3){
+			manifest_gles = "<uses-feature android:glEsVersion=\"0x00030000\"android:required=\"true\" />\n";
+		}
 
 		String manifest_screen_sizes = "<supports-screens ";
 		String screen_support_small = bool_to_string(p_preset->get("screen/support_small"));
@@ -839,13 +838,12 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		String manifest_feature;
 		int xr_mode_index = p_preset->get("xr_features/xr_mode");
 		if (xr_mode_index == 1 /* XRMode.OVR */) {
-
 			String focus_awareness = bool_to_string(p_preset->get("xr_features/focus_awareness"));
 			String xr_text = "<meta-data android:name=\"com.samsung.android.vr.application.mode\" android:value=\"vr_only\" />\n";
 			String fa_text = "<meta-data android:name=\"com.oculus.vr.focusaware\" android:value=\"" + focus_awareness + "\"/>\n";
 
 			int dof_index = p_preset->get("xr_features/degrees_of_freedom"); // 0: none, 1: 3dof and 6dof, 2: 6dof
-			String dof_string;
+			String dof_string = "";
 			if (dof_index == 2) {
 				dof_string = "<uses-feature android:name=\"android.hardware.vr.headtracking\" android:required=\"true\" android:version=\"1\"/>\n";
 			} else if (dof_index > 0) {
@@ -853,19 +851,18 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 			}
 
 			int hand_tracking_index = p_preset->get("xr_features/hand_tracking"); // 0: none, 1: optional, 2: required
-			String hand_tracking_string;
+			String hand_tracking_string = "";
 			if (hand_tracking_index == 2) {
 				hand_tracking_string = "<uses-feature android:name=\"oculus.software.handtracking\" android:required=\"true\"/>\n";
 			} else if (hand_tracking_index > 0) {
 				hand_tracking_string = "<uses-feature android:name=\"oculus.software.handtracking\" android:required=\"false\"/>\n";
 			}
-
 			manifest_feature = xr_text + fa_text + dof_string + hand_tracking_string;
 		}
-
 		String manifest_string = manifest_header + manifest_gles + manifest_screen_sizes + manifest_orientation + manifest_permission + manifest_plugins + manifest_feature;
 
 		//TODO: write manifest_string to file, use manifest merging
+		//TODO: modify godot/platform/android/java/app/AndroidManifest.xml
 	}
 
 	void _fix_manifest(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet) {
