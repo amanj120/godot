@@ -777,6 +777,97 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		}
 	}
 
+	String bool_to_string(bool v) {
+		return v ? "true" : "false";
+	}
+
+	void _write_tmp_manifest(const Ref<EditorExportPreset> &p_preset, bool p_give_internet) {
+		String manifest_header =
+				"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+				"<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
+				"    xmlns:tools=\"http://schemas.android.com/tools\"\n"
+				"    package=\"*PACKAGE_NAME*\"\n"
+				"    android:versionCode=\"*VERSION_CODE*\"\n"
+				"    android:versionName=\"*VERSION_NAME*\"\n"
+				"    android:installLocation=\"auto\" >\n";
+
+		String package_name = p_preset->get("package/unique_name");
+		manifest_header = manifest_header.replace("*PACKAGE_NAME*", get_package_name(package_name));
+		String version_name = p_preset->get("version/name");
+		manifest_header = manifest_header.replace("*VERSION_NAME*", version_name);
+		int version_code = p_preset->get("version/code");
+		manifest_header = manifest_header.replace("*VERSION_CODE*", itos(version_code));
+
+		bool min_gles3 = ProjectSettings::get_singleton()->get("rendering/quality/driver/driver_name") == "GLES3" &&
+						 !ProjectSettings::get_singleton()->get("rendering/quality/driver/fallback_to_gles2");
+		String gles_version = min_gles3 ? "0x00030000" : "0x00020000";
+		String manifest_gles = "<uses-feature ndroid:glEsVersion=\"" + gles_version + "\"android:required=\"true\" />\n";
+
+		String manifest_screen_sizes = "<supports-screens ";
+		String screen_support_small = bool_to_string(p_preset->get("screen/support_small"));
+		if (!p_preset->get("screen/support_small"))
+			manifest_screen_sizes = manifest_screen_sizes + "android:smallScreens=\"false\" ";
+		if (!p_preset->get("screen/support_normal"))
+			manifest_screen_sizes = manifest_screen_sizes + "android:normalScreens=\"false\" ";
+		if (!p_preset->get("screen/support_large"))
+			manifest_screen_sizes = manifest_screen_sizes + "android:largeScreens=\"false\" ";
+		if (!p_preset->get("screen/support_xlarge"))
+			manifest_screen_sizes = manifest_screen_sizes + "android:xlargeScreens=\"false\" ";
+		manifest_screen_sizes = manifest_screen_sizes + "/>\n";
+
+		String manifest_orientation;
+		int orientation = p_preset->get("screen/orientation"); //default value is landscape
+		if (orientation == 1) {
+			manifest_orientation =
+					"<activity android:name=\"com.godot.game.GodotApp\" android:screenOrientation=\"portrait\">";
+		}
+
+		Vector<String> perms;
+		_get_permissions(p_preset, p_give_internet, &perms);
+		String manifest_permission;
+		for (int i = 0; i < perms.size(); i++) {
+			manifest_permission = manifest_permission.insert(0, "\t<uses-permission android:name=\"" + perms.get(i) + "\"/>\n");
+		}
+
+		String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
+		String manifest_plugins;
+		if (!plugins_names.empty()) {
+			manifest_plugins =
+					"<meta-data android:name=\"plugins\" android:value=\"" + plugins_names + "\"/>\n";
+		}
+
+		String manifest_feature;
+		int xr_mode_index = p_preset->get("xr_features/xr_mode");
+		if (xr_mode_index == 1 /* XRMode.OVR */) {
+
+			String focus_awareness = bool_to_string(p_preset->get("xr_features/focus_awareness"));
+			String xr_text = "<meta-data android:name=\"com.samsung.android.vr.application.mode\" android:value=\"vr_only\" />\n";
+			String fa_text = "<meta-data android:name=\"com.oculus.vr.focusaware\" android:value=\"" + focus_awareness + "\"/>\n";
+
+			int dof_index = p_preset->get("xr_features/degrees_of_freedom"); // 0: none, 1: 3dof and 6dof, 2: 6dof
+			String dof_string;
+			if (dof_index == 2) {
+				dof_string = "<uses-feature android:name=\"android.hardware.vr.headtracking\" android:required=\"true\" android:version=\"1\"/>\n";
+			} else if (dof_index > 0) {
+				dof_string = "<uses-feature android:name=\"android.hardware.vr.headtracking\" android:required=\"false\" android:version=\"1\"/>\n";
+			}
+
+			int hand_tracking_index = p_preset->get("xr_features/hand_tracking"); // 0: none, 1: optional, 2: required
+			String hand_tracking_string;
+			if (hand_tracking_index == 2) {
+				hand_tracking_string = "<uses-feature android:name=\"oculus.software.handtracking\" android:required=\"true\"/>\n";
+			} else if (hand_tracking_index > 0) {
+				hand_tracking_string = "<uses-feature android:name=\"oculus.software.handtracking\" android:required=\"false\"/>\n";
+			}
+
+			manifest_feature = xr_text + fa_text + dof_string + hand_tracking_string;
+		}
+
+		String manifest_string = manifest_header + manifest_gles + manifest_screen_sizes + manifest_orientation + manifest_permission + manifest_plugins + manifest_feature;
+
+		//TODO: write manifest_string to file, use manifest merging
+	}
+
 	void _fix_manifest(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet) {
 		// Leaving the unused types commented because looking these constants up
 		// again later would be annoying
