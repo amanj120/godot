@@ -744,12 +744,13 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
-	//Needs to match the method parameters of EditorExportSaveSharedObject
+	// Implementation of EditorExportSaveSharedObject.
+	// Ignoring this setting allows all .so files to be included in gradle project
 	static Error ignore_so_file(void *p_userdata, const SharedObject &p_so) {
 		return OK;
 	}
 
-	//Multipurpose method used for storing files: writes p_data into a file at p_path, making directories if necessary
+	// Writes p_data into a file at p_path, creating directories if necessary.
 	static Error store_file_at_path(const String &p_path, const Vector<uint8_t> &p_data, int compression_method = Z_DEFLATED) {
 		String dir = p_path.get_base_dir();
 		if (!DirAccess::exists(dir)) {
@@ -764,13 +765,12 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
-	//Needs to match the method parameters of EditorExportSaveFunction
+	// Implementation of EditorExportSaveFunction.
 	static Error rename_and_store_file_in_gradle_project(void *p_userdata, const String &p_path, const Vector<uint8_t> &p_data, int p_file, int p_total) {
 		String dst_path = p_path.replace_first("res://", "res://android/build/assets/");
-		store_file_at_path(dst_path, p_data, 0);
+		store_file_at_path(dst_path, p_data, Z_NO_COMPRESSION);
 		return OK;
 	}
-
 
 	void _fix_manifest(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet) {
 
@@ -1507,7 +1507,8 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 
 	void _copy_icons_to_gradle_project(const Ref<EditorExportPreset> &p_preset) {
 		String project_icon_path = ProjectSettings::get_singleton()->get("application/config/icon");
-		// Prepare images to be resized for the icons. If some image ends up being uninitialized, the default image from the export template will be used.
+		// Prepare images to be resized for the icons. If some image ends up being uninitialized,
+		// the default image from the export template will be used.
 		Ref<Image> launcher_icon_image;
 		Ref<Image> launcher_adaptive_icon_foreground_image;
 		Ref<Image> launcher_adaptive_icon_background_image;
@@ -1535,7 +1536,6 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		}
 
 		for (int i = 0; i < icon_densities_count; ++i) {
-			//void _process_launcher_icons(const String &p_processing_file_name, const Ref<Image> &p_source_image, const LauncherIcon p_icon, Vector<uint8_t> &p_data)
 			if (launcher_icon_image.is_valid() && !launcher_icon_image->empty()) {
 				Vector<uint8_t> data = _resize_launcher_icon(launcher_icon_image, launcher_icons[i]);
 				String img_path = launcher_icons[i].export_path;
