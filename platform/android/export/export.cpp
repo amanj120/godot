@@ -798,7 +798,7 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		bool min_gles3 = ProjectSettings::get_singleton()->get("rendering/quality/driver/driver_name") == "GLES3" &&
 						 !ProjectSettings::get_singleton()->get("rendering/quality/driver/fallback_to_gles2");
 		String manifest_gles = "";
-		if(min_gles3){
+		if (min_gles3) {
 			manifest_gles = "<uses-feature android:glEsVersion=\"0x00030000\"android:required=\"true\" />\n";
 		}
 
@@ -863,6 +863,7 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 
 		//TODO: write manifest_string to file, use manifest merging
 		//TODO: modify godot/platform/android/java/app/AndroidManifest.xml
+		//TODO: make sure elements are in the correct order for the xml tree
 	}
 
 	void _fix_manifest(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet) {
