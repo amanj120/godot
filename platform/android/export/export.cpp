@@ -744,6 +744,21 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
+	// Writes string p_data to a file at p_path, creating directories as necessary.
+	static Error store_string_at_path(const String &p_path, const String &p_data, int compression_method = Z_DEFLATED) {
+		String dir = p_path.get_base_dir();
+		if (!DirAccess::exists(dir)) {
+			DirAccess *filesystem_da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
+			filesystem_da->make_dir_recursive(dir);
+			memdelete(filesystem_da);
+		}
+		FileAccess *fa = FileAccess::open(p_path, FileAccess::WRITE);
+		fa->store_string(p_data);
+		ERR_FAIL_COND_V_MSG(!fa, ERR_CANT_CREATE, "Cannot create file '" + p_path + "'.");
+		memdelete(fa);
+		return OK;
+	}
+
 	void _fix_manifest(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet) {
 
 		// Leaving the unused types commented because looking these constants up
@@ -1341,6 +1356,42 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 			return str;
 		}
 	}
+
+	// Creates strings.xml files inside the gradle project for different locales.
+	void _create_project_name_strings_files(const Ref<EditorExportPreset> &p_preset) {
+		XMLParser parser;
+		const char *locales[] = {
+			"ar", "bg", "ca", "cs", "da", "de", "el", "en", "es", "es_ES", "fa", "fi", "fr", "hi",
+			"hr", "hu", "in", "it", "iw", "ja", "ko", "lt", "lv", "nb", "nl", "pl", "pt", "ro",
+			"ru", "sk", "sl", "sr", "sv", "th", "tl", "tr", "uk", "vi", "zh", "zh_HK", "zh_TW"
+		};
+		// TODO: should we use "package/name" or "application/config/name"?
+		String package_name = p_preset->get("package/name");
+		String project_name = get_project_name(package_name);
+		size_t num_locales = sizeof(locales) / sizeof(locales[0]);
+
+		// Creates and stores the default strings.xml file.
+		String base_xml_string = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+								 "<resources>\n\t<string name=\"godot_project_name_string\">%s</string>\n</resources>";
+		String processed_default_xml_string = vformat(base_xml_string, parser.escape_special_characters(project_name));
+		store_string_at_path("res://android/build/res/values/strings.xml", processed_default_xml_string);
+
+		for (int i = 0; i < num_locales; i++) {
+			String locale = locales[i];
+			String property_name = "application/config/name_" + locale;
+			String hyphenated_locale = locale.replace("_", "-r");
+			String locale_directory = "res://android/build/res/values-" + hyphenated_locale + "/strings.xml";
+			if (ProjectSettings::get_singleton()->has_setting(property_name)) {
+				String locale_project_name = ProjectSettings::get_singleton()->get(property_name);
+				String processed_xml_string = vformat(base_xml_string, parser.escape_special_characters(locale_project_name));
+				store_string_at_path(locale_directory, processed_xml_string);
+			} else {
+				//TODO: Once the legacy build system is removed, get rid of this else branch
+				store_string_at_path(locale_directory, processed_default_xml_string);
+			}
+		}
+	}
+
 	void _fix_resources(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest) {
 
 		const int UTF8_FLAG = 0x00000100;

@@ -47,6 +47,14 @@ static bool _equalsn(const CharType *str1, const CharType *str2, int len) {
 	return (i == len) || (str1[i] == 0 && str2[i] == 0);
 }
 
+String XMLParser::escape_special_characters(const String &input) {
+	return input.replace("<", "&lt;")
+			.replace(">", "&gt;")
+			.replace("&", "&amp;")
+			.replace("\"", "&quot;")
+			.replace("'", "&apos;");
+}
+
 String XMLParser::_replace_special_characters(const String &origstr) {
 
 	int pos = origstr.find("&");

@@ -108,7 +108,7 @@ public:
 	String get_attribute_value_safe(const String &p_name) const; // do not print error if doesn't exist
 	bool is_empty() const;
 	int get_current_line() const;
-
+	String escape_special_characters(const String &input);
 	void skip_section();
 	Error seek(uint64_t p_pos);
 
