@@ -744,12 +744,12 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		return OK;
 	}
 
-	void _get_permissions(const Ref<EditorExportPreset> &p_preset, bool p_give_internet, Vector<String> *perms) {
+	void _get_permissions(const Ref<EditorExportPreset> &p_preset, bool p_give_internet, Vector<String> &r_permissions) {
 		const char **aperms = android_perms;
 		while (*aperms) {
 			bool enabled = p_preset->get("permissions/" + String(*aperms).to_lower());
 			if (enabled) {
-				perms->push_back("android.permission." + String(*aperms));
+				r_permissions.push_back("android.permission." + String(*aperms));
 			}
 			aperms++;
 		}
@@ -757,12 +757,12 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		for (int i = 0; i < user_perms.size(); i++) {
 			String user_perm = user_perms[i].strip_edges();
 			if (!user_perm.empty()) {
-				perms->push_back(user_perm);
+				r_permissions.push_back(user_perm);
 			}
 		}
 		if (p_give_internet) {
-			if (perms->find("android.permission.INTERNET") == -1) {
-				perms->push_back("android.permission.INTERNET");
+			if (r_permissions.find("android.permission.INTERNET") == -1) {
+				r_permissions.push_back("android.permission.INTERNET");
 			}
 		}
 
@@ -770,8 +770,8 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		if (xr_mode_index == 1 /* XRMode.OVR */) {
 			int hand_tracking_index = p_preset->get("xr_features/hand_tracking"); // 0: none, 1: optional, 2: required
 			if (hand_tracking_index > 0) {
-				if (perms->find("com.oculus.permission.HAND_TRACKING") == -1) {
-					perms->push_back("com.oculus.permission.HAND_TRACKING");
+				if (r_permissions.find("com.oculus.permission.HAND_TRACKING") == -1) {
+					r_permissions.push_back("com.oculus.permission.HAND_TRACKING");
 				}
 			}
 		}
@@ -912,7 +912,8 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
 
 		Vector<String> perms;
-		_get_permissions(p_preset, p_give_internet, &perms);
+		// Write permissions into the perms variable.
+		_get_permissions(p_preset, p_give_internet, perms);
 
 		while (ofs < (uint32_t)p_manifest.size()) {
 
@@ -1436,12 +1437,12 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		}
 	}
 
-	void _fix_resources(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest) {
+	void _fix_resources(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &r_manifest) {
 		const int UTF8_FLAG = 0x00000100;
 
-		uint32_t string_block_len = decode_uint32(&p_manifest[16]);
-		uint32_t string_count = decode_uint32(&p_manifest[20]);
-		uint32_t string_flags = decode_uint32(&p_manifest[28]);
+		uint32_t string_block_len = decode_uint32(&r_manifest[16]);
+		uint32_t string_count = decode_uint32(&r_manifest[20]);
+		uint32_t string_flags = decode_uint32(&r_manifest[28]);
 		const uint32_t string_table_begins = 40;
 
 		Vector<String> string_table;
@@ -1450,10 +1451,10 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 
 		for (uint32_t i = 0; i < string_count; i++) {
 
-			uint32_t offset = decode_uint32(&p_manifest[string_table_begins + i * 4]);
+			uint32_t offset = decode_uint32(&r_manifest[string_table_begins + i * 4]);
 			offset += string_table_begins + string_count * 4;
 
-			String str = _parse_string(&p_manifest[offset], string_flags & UTF8_FLAG);
+			String str = _parse_string(&r_manifest[offset], string_flags & UTF8_FLAG);
 
 			if (str.begins_with("godot-project-name")) {
 
@@ -1482,7 +1483,7 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 
 		for (uint32_t i = 0; i < string_table_begins; i++) {
 
-			ret.write[i] = p_manifest[i];
+			ret.write[i] = r_manifest[i];
 		}
 
 		int ofs = 0;
@@ -1518,15 +1519,15 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		//append the rest...
 		int rest_from = 12 + string_block_len;
 		int rest_to = ret.size();
-		int rest_len = (p_manifest.size() - rest_from);
-		ret.resize(ret.size() + (p_manifest.size() - rest_from));
+		int rest_len = (r_manifest.size() - rest_from);
+		ret.resize(ret.size() + (r_manifest.size() - rest_from));
 		for (int i = 0; i < rest_len; i++) {
-			ret.write[rest_to + i] = p_manifest[rest_from + i];
+			ret.write[rest_to + i] = r_manifest[rest_from + i];
 		}
 		//finally update the size
 		encode_uint32(ret.size(), &ret.write[4]);
 
-		p_manifest = ret;
+		r_manifest = ret;
 		//printf("end\n");
 	}
 
@@ -2370,7 +2371,7 @@ public:
 		return have_plugins_changed || first_build;
 	}
 
-	Error get_command_line_flags(const Ref<EditorExportPreset> &p_preset, const String &p_path, int p_flags, Vector<uint8_t> *command_line_flags) {
+	Error get_command_line_flags(const Ref<EditorExportPreset> &p_preset, const String &p_path, int p_flags, Vector<uint8_t> &r_command_line_flags) {
 		String cmdline = p_preset->get("command_line/extra_args");
 		Vector<String> command_line_strings = cmdline.strip_edges().split(" ");
 		for (int i = 0; i < command_line_strings.size(); i++) {
@@ -2426,18 +2427,18 @@ public:
 		}
 
 		if (command_line_strings.size()) {
-			command_line_flags->resize(4);
-			encode_uint32(command_line_strings.size(), &command_line_flags->write[0]);
+			r_command_line_flags.resize(4);
+			encode_uint32(command_line_strings.size(), &r_command_line_flags.write[0]);
 			for (int i = 0; i < command_line_strings.size(); i++) {
 				print_line(itos(i) + " param: " + command_line_strings[i]);
 				CharString command_line_argument = command_line_strings[i].utf8();
-				int base = command_line_flags->size();
+				int base = r_command_line_flags.size();
 				int length = command_line_argument.length();
 				if (length == 0)
 					continue;
-				command_line_flags->resize(base + 4 + length);
-				encode_uint32(length, &command_line_flags->write[base]);
-				copymem(&command_line_flags->write[base + 4], command_line_argument.ptr(), length);
+				r_command_line_flags.resize(base + 4 + length);
+				encode_uint32(length, &r_command_line_flags.write[base]);
+				copymem(&r_command_line_flags.write[base + 4], command_line_argument.ptr(), length);
 			}
 		}
 		return OK;
@@ -2589,6 +2590,7 @@ public:
 		String version_name = p_preset->get("version/name");
 		String package_name = p_preset->get("package/unique_name");
 
+		bool apk_expansion = p_preset->get("apk_expansion/enable");
 		String apk_expansion_pkey = p_preset->get("apk_expansion/public_key");
 
 		String release_keystore = p_preset->get("keystore/release");
@@ -2729,21 +2731,36 @@ public:
 			ed.ep = &ep;
 			ed.apk = unaligned_apk;
 			err = export_project_files(p_preset, ignore_apk_file, &ed, save_apk_so);
-		} else {
+		} else if (!apk_expansion) {
 			APKExportData ed;
 			ed.ep = &ep;
 			ed.apk = unaligned_apk;
 			err = export_project_files(p_preset, save_apk_file, &ed, save_apk_so);
 		}
 
-		Vector<uint8_t> command_line_flags;
-		err = get_command_line_flags(p_preset, p_path, p_flags, &command_line_flags);
-
 		if (err != OK) {
 			unzClose(pkg);
-			EditorNode::add_io_error("Could not write expansion package file");
+			EditorNode::add_io_error("Could not export project files");
 			CLEANUP_AND_RETURN(ERR_SKIP);
 		}
+
+		Vector<uint8_t> command_line_flags;
+		// Write command line flags into the command_line_flags variable.
+		err = get_command_line_flags(p_preset, p_path, p_flags, command_line_flags);
+
+		zip_fileinfo zipfi = get_zip_fileinfo();
+		zipOpenNewFileInZip(unaligned_apk,
+				"assets/_cl_",
+				&zipfi,
+				NULL,
+				0,
+				NULL,
+				0,
+				NULL,
+				0, // No compress (little size gain and potentially slower startup)
+				Z_DEFAULT_COMPRESSION);
+		zipWriteInFileInZip(unaligned_apk, command_line_flags.ptr(), command_line_flags.size());
+		zipCloseFileInZip(unaligned_apk);
 
 		zip_fileinfo zipfi = get_zip_fileinfo();
 		zipOpenNewFileInZip(unaligned_apk,
@@ -2908,12 +2925,10 @@ public:
 
 			memset(extra + info.size_file_extra, 0, padding);
 
-			// write
-			zip_fileinfo zipfi = get_zip_fileinfo();
-
+			zip_fileinfo fileinfo = get_zip_fileinfo();
 			zipOpenNewFileInZip2(final_apk,
 					file.utf8().get_data(),
-					&zipfi,
+					&fileinfo,
 					extra,
 					info.size_file_extra + padding,
 					NULL,
