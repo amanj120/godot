@@ -28,6 +28,22 @@ ext.getExportPackageName = { ->
     return appId
 }
 
+ext.getExportVersionCode = { ->
+    String versionCode = project.hasProperty("version_code") ? project.property("version_code") : ""
+    if (versionCode == null || versionCode.isEmpty()) {
+        versionCode = "1"
+    }
+    return Integer.parseInt(versionCode)
+}
+
+ext.getExportVersionName = { ->
+    String versionName = project.hasProperty("version_name") ? project.property("version_name") : ""
+    if (versionName == null || versionName.isEmpty()) {
+        versionName = "1.0"
+    }
+    return versionName
+}
+
 final String PLUGIN_VALUE_SEPARATOR_REGEX = "\\|"
 
 /**

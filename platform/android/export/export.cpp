@@ -778,6 +778,81 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		}
 	}
 
+	void _write_tmp_manifest(const Ref<EditorExportPreset> &p_preset, bool p_give_internet, bool p_debug) {
+		String manifest_text =
+				"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+				"<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
+				"    xmlns:tools=\"http://schemas.android.com/tools\">\n";
+
+		manifest_text += _get_screen_sizes_tag(p_preset);
+		manifest_text += _get_gles_tag();
+
+		Vector<String> perms;
+		_get_permissions(p_preset, p_give_internet, perms);
+		for (int i = 0; i < perms.size(); i++) {
+			manifest_text += vformat("    <uses-permission android:name=\"%s\" />\n", perms.get(i));
+		}
+
+		bool uses_xr = (int)(p_preset->get("xr_features/xr_mode")) == 1;
+		if (uses_xr) {
+			int dof_index = p_preset->get("xr_features/degrees_of_freedom"); // 0: none, 1: 3dof and 6dof, 2: 6dof
+			if (dof_index == 1) {
+				manifest_text += "    <uses-feature tools:node=\"replace\" android:name=\"android.hardware.vr.headtracking\" android:required=\"false\" android:version=\"1\" />\n";
+			} else if (dof_index == 2) {
+				manifest_text += "    <uses-feature tools:node=\"replace\" android:name=\"android.hardware.vr.headtracking\" android:required=\"true\" android:version=\"1\" />\n";
+			}
+			int hand_tracking_index = p_preset->get("xr_features/hand_tracking"); // 0: none, 1: optional, 2: required
+			if (hand_tracking_index == 1) {
+				manifest_text += "    <uses-feature tools:node=\"replace\" android:name=\"oculus.software.handtracking\" android:required=\"false\" />\n";
+			} else if (hand_tracking_index == 2) {
+				manifest_text += "    <uses-feature tools:node=\"replace\" android:name=\"oculus.software.handtracking\" android:required=\"true\" />\n";
+			}
+		}
+
+		String package_name = p_preset->get("package/unique_name");
+		manifest_text += vformat(
+				"    <instrumentation\n"
+				"        tools:node=\"replace\"\n"
+				"        android:name=\".GodotInstrumentation\"\n"
+				"        android:icon=\"@mipmap/icon\"\n"
+				"        android:label=\"@string/godot_project_name_string\"\n"
+				"        android:targetPackage=\"%s\" />\n",
+				package_name);
+
+		manifest_text +=
+				"    <application android:label=\"@string/godot_project_name_string\"\n"
+				"        android:allowBackup=\"false\" tools:ignore=\"GoogleAppIndexingWarning\"\n"
+				"        android:icon=\"@mipmap/icon\">)\n";
+
+		String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
+		if (!plugins_names.empty()) {
+			manifest_text += vformat("    <meta-data tools:node=\"replace\" android:name=\"plugins\" android:value=\"%s\" />\n", plugins_names);
+		}
+
+		if (uses_xr) {
+			manifest_text += "        <meta-data tools:node=\"replace\" android:name=\"com.samsung.android.vr.application.mode\" android:value=\"vr_only\" />\n";
+		}
+
+		String orientation = (int)(p_preset->get("screen/orientation")) == 1 ? "portrait" : "landscape";
+		manifest_text += vformat(
+				"        <activity android:name=\"com.godot.game.GodotApp\" "
+				"tools:replace=\"android:screenOrientation\" "
+				"android:screenOrientation=\"%s\">\n",
+				orientation);
+
+		if (uses_xr) {
+			String focus_awareness = bool_to_string(p_preset->get("xr_features/focus_awareness"));
+			manifest_text += vformat("            <meta-data tools:node=\"replace\" android:name=\"com.oculus.vr.focusaware\" android:value=\"%s\" />\n", focus_awareness);
+		}
+
+		manifest_text += "        </activity>\n";
+		manifest_text += "    </application>\n";
+		manifest_text += "</manifest>\n";
+
+		String manifest_path = vformat("res://android/build/src/%s/AndroidManifest.xml", (p_debug ? "debug" : "release"));
+		store_string_at_path(manifest_path, manifest_text);
+	}
+
 	void _fix_manifest(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet) {
 		// Leaving the unused types commented because looking these constants up
 		// again later would be annoying
@@ -2365,6 +2440,7 @@ public:
 		EditorProgress ep("export", "Exporting for Android", 105, true);
 
 		bool use_custom_build = bool(p_preset->get("custom_template/use_custom_build"));
+		bool p_give_internet = p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG);
 
 		if (use_custom_build) {
 			//re-generate build.gradle and AndroidManifest.xml
@@ -2388,6 +2464,8 @@ public:
 			if (err != OK) {
 				EditorNode::add_io_error("Unable to overwrite res://android/build/res/*.xml files with project name");
 			}
+
+			_write_tmp_manifest(p_preset, p_give_internet, p_debug);
 			//build project if custom build is enabled
 			String sdk_path = EDITOR_GET("export/android/custom_build_sdk_path");
 
@@ -2409,6 +2487,8 @@ public:
 			build_command = build_path.plus_file(build_command);
 
 			String package_name = get_package_name(p_preset->get("package/unique_name"));
+			String version_code = itos(p_preset->get("version/code"));
+			String version_name = p_preset->get("version/name");
 
 			Vector<PluginConfig> enabled_plugins = get_enabled_plugins(p_preset);
 			String local_plugins_binaries = get_plugins_binaries(BINARY_TYPE_LOCAL, enabled_plugins);
@@ -2422,6 +2502,8 @@ public:
 			}
 			cmdline.push_back("build");
 			cmdline.push_back("-Pexport_package_name=" + package_name); // argument to specify the package name.
+			cmdline.push_back("-Pversion_code=" + version_code); // argument to specify the version code.
+			cmdline.push_back("-Pversion_name=" + version_name); // argument to specify the version name.
 			cmdline.push_back("-Pplugins_local_binaries=" + local_plugins_binaries); // argument to specify the list of plugins local dependencies.
 			cmdline.push_back("-Pplugins_remote_binaries=" + remote_plugins_binaries); // argument to specify the list of plugins remote dependencies.
 			cmdline.push_back("-Pplugins_maven_repos=" + custom_maven_repos); // argument to specify the list of custom maven repos for the plugins dependencies.
@@ -2571,12 +2653,11 @@ public:
 
 			//write
 
-			if (file == "AndroidManifest.xml") {
-				_fix_manifest(p_preset, data, p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
-			}
-
-			if (file == "resources.arsc") {
-				if (!use_custom_build) {
+			if (!use_custom_build) {
+				if (file == "AndroidManifest.xml") {
+					_fix_manifest(p_preset, data, p_give_internet);
+				}
+				if (file == "resources.arsc") {
 					_fix_resources(p_preset, data);
 				}
 			}
