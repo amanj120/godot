@@ -241,5 +241,4 @@ String _get_application_tag(const Ref<EditorExportPreset> &p_preset, const Strin
 	manifest_application_text += "    </application>\n";
 	return manifest_application_text;
 }
-
 #endif //GODOT_GRADLE_EXPORT_UTIL_H
