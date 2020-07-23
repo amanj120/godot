@@ -1591,6 +1591,7 @@ public:
 		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "custom_template/debug", PROPERTY_HINT_GLOBAL_FILE, "*.apk"), ""));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "custom_template/release", PROPERTY_HINT_GLOBAL_FILE, "*.apk"), ""));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "custom_template/use_custom_build"), false));
+		r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "custom_template/export_app_bundle"), false));
 
 		Vector<PluginConfig> plugins_configs = get_plugins();
 		for (int i = 0; i < plugins_configs.size(); i++) {
@@ -2050,6 +2051,14 @@ public:
 			}
 		}
 
+		if (bool(p_preset->get("custom_template/export_app_bundle"))) {
+			if (!bool(p_preset->get("custom_template/use_custom_build"))) {
+				valid = false;
+				err += TTR("\"Export App Bundle\" is only valid when \"Use Custom Build\" is enabled.");
+				err += "\n";
+			}
+		}
+
 		r_error = err;
 		return valid;
 	}
@@ -2057,6 +2066,8 @@ public:
 	virtual List<String> get_binary_extensions(const Ref<EditorExportPreset> &p_preset) const {
 		List<String> list;
 		list.push_back("apk");
+		list.push_back("aab");
+		//TODO: make sure "aab" is selected only when "export_app_bundle" is selected.
 		return list;
 	}
 
@@ -2447,6 +2458,7 @@ public:
 		EditorProgress ep("export", "Exporting for Android", 105, true);
 
 		bool use_custom_build = bool(p_preset->get("custom_template/use_custom_build"));
+		bool export_app_bundle = bool(p_preset->get("custom_template/export_app_bundle"));
 		bool p_give_internet = p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG);
 
 		Ref<Image> main_image;
@@ -2488,13 +2500,26 @@ public:
 
 			_update_custom_build_project();
 
+			if (export_app_bundle) {
+				//stores all the project files inside the Gradle project directory. Also includes all ABIs
+				err = export_project_files(p_preset, rename_and_store_file_in_gradle_project, NULL, ignore_so_file);
+				if (err != OK) {
+					EditorNode::add_io_error("Could not export project files to gradle project\n");
+					return err;
+				}
+			}
+
 			OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
 
 			String build_command;
+			String copy_command;
+
 #ifdef WINDOWS_ENABLED
 			build_command = "gradlew.bat";
+			copy_command = "copy";
 #else
 			build_command = "gradlew";
+			copy_command = "cp";
 #endif
 
 			String build_path = ProjectSettings::get_singleton()->get_resource_path().plus_file("android/build");
@@ -2515,7 +2540,15 @@ public:
 			if (clean_build_required) {
 				cmdline.push_back("clean");
 			}
-			cmdline.push_back("build");
+
+			if (export_app_bundle) {
+				String build_type = (p_debug ? "Debug" : "Release");
+				String build_command = vformat("bundle%s", build_type);
+				cmdline.push_back(build_command);
+			} else {
+				cmdline.push_back("build");
+			}
+
 			cmdline.push_back("-Pexport_package_name=" + package_name); // argument to specify the package name.
 			cmdline.push_back("-Pexport_version_code=" + version_code); // argument to specify the version code.
 			cmdline.push_back("-Pexport_version_name=" + version_name); // argument to specify the version name.
@@ -2536,6 +2569,26 @@ public:
 				EditorNode::get_singleton()->show_warning(TTR("Building of Android project failed, check output for the error.\nAlternatively visit docs.godotengine.org for Android build documentation."));
 				return ERR_CANT_CREATE;
 			}
+
+			if (export_app_bundle) {
+				List<String> copy_args;
+				String output_path;
+				if (p_debug) {
+					output_path = "android/build/build/outputs/bundle/debug/build_debug.aab";
+				} else {
+					output_path = "android/build/build/outputs/bundle/release/build_release.aab";
+				}
+
+				copy_args.push_back(ProjectSettings::get_singleton()->get_resource_path().plus_file(output_path));
+				copy_args.push_back(p_path.replace(".apk", ".aab"));
+				int copy_result = EditorNode::get_singleton()->execute_and_show_output(TTR("Moving output"), copy_command, copy_args);
+				if (copy_result != 0) {
+					EditorNode::get_singleton()->show_warning(TTR("Unable to copy and rename export file, check gradle project directory for outputs."));
+					return ERR_CANT_CREATE;
+				}
+				return OK;
+			}
+
 			if (p_debug) {
 				src_apk = build_path.plus_file("build/outputs/apk/debug/android_debug.apk");
 			} else {
