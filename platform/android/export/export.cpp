@@ -778,6 +778,81 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 		}
 	}
 
+	void _write_tmp_manifest(const Ref<EditorExportPreset> &p_preset, bool p_give_internet, bool p_debug) {
+		String manifest_text =
+				"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+				"<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
+				"    xmlns:tools=\"http://schemas.android.com/tools\">\n";
+
+		manifest_text += _get_screen_sizes_tag(p_preset);
+		manifest_text += _get_gles_tag();
+
+		Vector<String> perms;
+		_get_permissions(p_preset, p_give_internet, perms);
+		for (int i = 0; i < perms.size(); i++) {
+			manifest_text += vformat("    <uses-permission android:name=\"%s\" />\n", perms.get(i));
+		}
+
+		bool uses_xr = (int)(p_preset->get("xr_features/xr_mode")) == 1;
+		if (uses_xr) {
+			int dof_index = p_preset->get("xr_features/degrees_of_freedom"); // 0: none, 1: 3dof and 6dof, 2: 6dof
+			if (dof_index == 1) {
+				manifest_text += "    <uses-feature tools:node=\"replace\" android:name=\"android.hardware.vr.headtracking\" android:required=\"false\" android:version=\"1\" />\n";
+			} else if (dof_index == 2) {
+				manifest_text += "    <uses-feature tools:node=\"replace\" android:name=\"android.hardware.vr.headtracking\" android:required=\"true\" android:version=\"1\" />\n";
+			}
+			int hand_tracking_index = p_preset->get("xr_features/hand_tracking"); // 0: none, 1: optional, 2: required
+			if (hand_tracking_index == 1) {
+				manifest_text += "    <uses-feature tools:node=\"replace\" android:name=\"oculus.software.handtracking\" android:required=\"false\" />\n";
+			} else if (hand_tracking_index == 2) {
+				manifest_text += "    <uses-feature tools:node=\"replace\" android:name=\"oculus.software.handtracking\" android:required=\"true\" />\n";
+			}
+		}
+
+		String package_name = p_preset->get("package/unique_name");
+		manifest_text += vformat(
+				"    <instrumentation\n"
+				"        tools:node=\"replace\"\n"
+				"        android:name=\".GodotInstrumentation\"\n"
+				"        android:icon=\"@mipmap/icon\"\n"
+				"        android:label=\"@string/godot_project_name_string\"\n"
+				"        android:targetPackage=\"%s\" />\n",
+				package_name);
+
+		manifest_text +=
+				"    <application android:label=\"@string/godot_project_name_string\"\n"
+				"        android:allowBackup=\"false\" tools:ignore=\"GoogleAppIndexingWarning\"\n"
+				"        android:icon=\"@mipmap/icon\">)\n";
+
+		String plugins_names = get_plugins_names(get_enabled_plugins(p_preset));
+		if (!plugins_names.empty()) {
+			manifest_text += vformat("    <meta-data tools:node=\"replace\" android:name=\"plugins\" android:value=\"%s\" />\n", plugins_names);
+		}
+
+		if (uses_xr) {
+			manifest_text += "        <meta-data tools:node=\"replace\" android:name=\"com.samsung.android.vr.application.mode\" android:value=\"vr_only\" />\n";
+		}
+
+		String orientation = (int)(p_preset->get("screen/orientation")) == 1 ? "portrait" : "landscape";
+		manifest_text += vformat(
+				"        <activity android:name=\"com.godot.game.GodotApp\" "
+				"tools:replace=\"android:screenOrientation\" "
+				"android:screenOrientation=\"%s\">\n",
+				orientation);
+
+		if (uses_xr) {
+			String focus_awareness = bool_to_string(p_preset->get("xr_features/focus_awareness"));
+			manifest_text += vformat("            <meta-data tools:node=\"replace\" android:name=\"com.oculus.vr.focusaware\" android:value=\"%s\" />\n", focus_awareness);
+		}
+
+		manifest_text += "        </activity>\n";
+		manifest_text += "    </application>\n";
+		manifest_text += "</manifest>\n";
+
+		String manifest_path = vformat("res://android/build/src/%s/AndroidManifest.xml", (p_debug ? "debug" : "release"));
+		store_string_at_path(manifest_path, manifest_text);
+	}
+
 	void _fix_manifest(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet) {
 		// Leaving the unused types commented because looking these constants up
 		// again later would be annoying
@@ -1450,7 +1525,6 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 			working_image = p_source_image->duplicate();
 			working_image->resize(dimension, dimension, Image::Interpolation::INTERPOLATE_LANCZOS);
 		}
-
 		PoolVector<uint8_t> png_buffer;
 		Error err = PNGDriverCommon::image_to_png(working_image, png_buffer);
 		if (err == OK) {
@@ -1498,21 +1572,18 @@ class EditorExportPlatformAndroid : public EditorExportPlatform {
 			const Ref<Image> &foreground, const Ref<Image> &background) {
 		// Prepare images to be resized for the icons. If some image ends up being uninitialized,
 		// the default image from the export template will be used.
-
 		for (int i = 0; i < icon_densities_count; ++i) {
 			if (main_image.is_valid() && !main_image->empty()) {
 				Vector<uint8_t> data;
 				_process_launcher_icons(launcher_icons[i].export_path, main_image, launcher_icons[i].dimensions, data);
 				store_image(launcher_icons[i], data);
 			}
-
 			if (foreground.is_valid() && !foreground->empty()) {
 				Vector<uint8_t> data;
 				_process_launcher_icons(launcher_adaptive_icon_foregrounds[i].export_path, foreground,
 						launcher_adaptive_icon_foregrounds[i].dimensions, data);
 				store_image(launcher_adaptive_icon_foregrounds[i], data);
 			}
-
 			if (background.is_valid() && !background->empty()) {
 				Vector<uint8_t> data;
 				_process_launcher_icons(launcher_adaptive_icon_backgrounds[i].export_path, background,
@@ -1567,6 +1638,7 @@ public:
 		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "custom_template/debug", PROPERTY_HINT_GLOBAL_FILE, "*.apk"), ""));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "custom_template/release", PROPERTY_HINT_GLOBAL_FILE, "*.apk"), ""));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "custom_template/use_custom_build"), false));
+		r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "custom_template/use_gradle_build", PROPERTY_HINT_ENUM, "Do Not Use Gradle Project,Setup Gradle Project,Setup Gradle Project and Build APK,Setup Gradle Project and Build AAB"), 0));
 
 		Vector<PluginConfig> plugins_configs = get_plugins();
 		for (int i = 0; i < plugins_configs.size(); i++) {
@@ -1946,6 +2018,18 @@ public:
 			if (!FileAccess::exists("res://android/build/build.gradle")) {
 
 				err += TTR("Android build template not installed in the project. Install it from the Project menu.") + "\n";
+				valid = false;
+			}
+
+			int use_gradle_project = int(p_preset->get("custom_template/use_gradle_build"));
+			if (use_gradle_project == 1) {
+				err += TTR("Cannot select 'Use Custom Build' and 'Setup Gradle Project' at the same time.") + "\n";
+				valid = false;
+			} else if (use_gradle_project == 2) {
+				err += TTR("Cannot select 'Use Custom Build' and 'Setup Gradle Project and Build APK' at the same time.") + "\n";
+				valid = false;
+			} else if (use_gradle_project == 3) {
+				err += TTR("Cannot select 'Use Custom Build' and 'Setup Gradle Project and Build AAB' at the same time.") + "\n";
 				valid = false;
 			}
 		}
@@ -2414,6 +2498,134 @@ public:
 		return OK;
 	}
 
+	Error setup_gradle_project(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, int p_flags = 0) {
+		Ref<Image> main_image;
+		Ref<Image> foreground;
+		Ref<Image> background;
+		load_icon_refs(p_preset, main_image, foreground, background);
+
+		//re-generate build.gradle and AndroidManifest.xml
+		{ //test that installed build version is alright
+			FileAccessRef f = FileAccess::open("res://android/.build_version", FileAccess::READ);
+			if (!f) {
+				EditorNode::get_singleton()->show_warning(TTR("Please reinstall Android Custom Build Template from the 'Project' menu."));
+				return ERR_UNCONFIGURED;
+			}
+			String version = f->get_line().strip_edges();
+			if (version != VERSION_FULL_CONFIG) {
+				EditorNode::get_singleton()->show_warning(vformat(TTR("Android build version mismatch:\n   Template installed: %s\n   Godot Version: %s\nPlease reinstall Android build template from 'Project' menu."), version, VERSION_FULL_CONFIG));
+				return ERR_UNCONFIGURED;
+			}
+		}
+
+		if (p_path.find(ProjectSettings::get_singleton()->get_resource_path(), 0) == -1) {
+			EditorNode::add_io_error("The output apk must be saved within your godot project directory\n");
+			return ERR_CANT_CREATE;
+		}
+
+		// TODO: should we use "package/name" or "application/config/name"?
+		String project_name = get_project_name(p_preset->get("package/name"));
+		// instead of calling _fix_resources
+		Error err = _create_project_name_strings_files(p_preset, project_name);
+		if (err != OK) {
+			EditorNode::add_io_error("Unable to overwrite res://android/build/res/*.xml files with project name");
+		}
+		// Copy project icons into the Gradle project
+		_copy_icons_to_gradle_project(p_preset, main_image, foreground, background);
+		bool p_give_internet = p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG);
+		_write_tmp_manifest(p_preset, p_give_internet, p_debug);
+		_update_custom_build_project();
+
+		err = export_project_files(p_preset, rename_and_store_file_in_gradle_project, NULL, ignore_so_file);
+
+		if (err != OK) {
+			EditorNode::add_io_error("Could not export project files to gradle project\n");
+			return err;
+		}
+
+		return OK;
+	}
+
+	Error build_gradle_project(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, bool export_bundle) {
+		String sdk_path = EDITOR_GET("export/android/custom_build_sdk_path");
+		ERR_FAIL_COND_V_MSG(sdk_path == "", ERR_UNCONFIGURED, "Android SDK path must be configured in Editor Settings at 'export/android/custom_build_sdk_path'.");
+		OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
+
+		String build_command;
+		String copy_command;
+		String package_name = get_package_name(p_preset->get("package/unique_name"));
+
+#ifdef WINDOWS_ENABLED
+		build_command = "gradlew.bat";
+		copy_command = "copy";
+#else
+		build_command = "gradlew";
+		copy_command = "cp";
+#endif
+
+		String build_path = ProjectSettings::get_singleton()->get_resource_path().plus_file("android/build");
+		build_command = build_path.plus_file(build_command);
+
+		Vector<PluginConfig> enabled_plugins = get_enabled_plugins(p_preset);
+		String local_plugins_binaries = get_plugins_binaries(BINARY_TYPE_LOCAL, enabled_plugins);
+		String remote_plugins_binaries = get_plugins_binaries(BINARY_TYPE_REMOTE, enabled_plugins);
+		String custom_maven_repos = get_plugins_custom_maven_repos(enabled_plugins);
+		String version_code = itos(p_preset->get("version/code"));
+		String version_name = p_preset->get("version/name");
+
+		bool clean_build_required = is_clean_build_required(enabled_plugins);
+		List<String> cmdline;
+		if (clean_build_required) {
+			cmdline.push_back("clean");
+		}
+
+		//TODO: is assemble the correct gradle task for building an apk?
+		String build_type = (p_debug ? "Debug" : "Release");
+		build_type = build_type.insert(0, (export_bundle ? "bundle" : "assemble"));
+		cmdline.push_back(build_type);
+
+		cmdline.push_back("-Pexport_package_name=" + package_name); // argument to specify the package name.
+		cmdline.push_back("-Pversion_code=" + version_code); // argument to specify the package name.
+		cmdline.push_back("-Pversion_name=" + version_name); // argument to specify the package name.
+		cmdline.push_back("-Pplugins_local_binaries=" + local_plugins_binaries); // argument to specify the list of plugins local dependencies.
+		cmdline.push_back("-Pplugins_remote_binaries=" + remote_plugins_binaries); // argument to specify the list of plugins remote dependencies.
+		cmdline.push_back("-Pplugins_maven_repos=" + custom_maven_repos); // argument to specify the list of custom maven repos for the plugins dependencies.
+		cmdline.push_back("-p"); // argument to specify the start directory.
+		cmdline.push_back(build_path); // start directory.
+
+		//Executes the build command
+		int result = EditorNode::get_singleton()->execute_and_show_output(TTR("Building Android Project (gradle)"), build_command, cmdline);
+		if (result != 0) {
+			EditorNode::get_singleton()->show_warning(TTR("Building of Android project failed, check output for the error.\nAlternatively visit docs.godotengine.org for Android build documentation."));
+			return ERR_CANT_CREATE;
+		}
+
+		List<String> copy_args;
+		String output_path;
+		if (export_bundle) {
+			if (p_debug) {
+				output_path = "android/build/build/outputs/bundle/debug/build_debug.aab";
+			} else {
+				output_path = "android/build/build/outputs/bundle/release/build_release.aab";
+			}
+		} else {
+			if (p_debug) {
+				output_path = "android/build/build/outputs/apk/debug/android_debug.apk";
+			} else {
+				output_path = "android/build/build/outputs/apk/release/android_release.apk";
+			}
+		}
+
+		copy_args.push_back(ProjectSettings::get_singleton()->get_resource_path().plus_file(output_path));
+		copy_args.push_back(export_bundle ? p_path.replace(".apk", ".aab") : p_path);
+		int copy_result = EditorNode::get_singleton()->execute_and_show_output(TTR("Moving output"), copy_command, copy_args);
+		if (copy_result != 0) {
+			EditorNode::get_singleton()->show_warning(TTR("Unable to copy and rename export file, check gradle project directory for outputs."));
+			return ERR_CANT_CREATE;
+		}
+		return OK;
+	}
+
 	virtual Error export_project(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, int p_flags = 0) {
 
 		ExportNotifier notifier(*this, p_preset, p_debug, p_path, p_flags);
@@ -2423,15 +2635,24 @@ public:
 		EditorProgress ep("export", "Exporting for Android", 105, true);
 
 		bool use_custom_build = bool(p_preset->get("custom_template/use_custom_build"));
+		bool p_give_internet = p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG);
+		int use_gradle_project_build = int(p_preset->get("custom_template/use_gradle_build"));
 
 		Ref<Image> main_image;
 		Ref<Image> foreground;
 		Ref<Image> background;
-
 		load_icon_refs(p_preset, main_image, foreground, background);
 
+		if (use_gradle_project_build != 0) {
+			Error err = setup_gradle_project(p_preset, p_debug, p_path, p_flags);
+			if (err != OK || use_gradle_project_build == 1) {
+				return err;
+			}
+			err = build_gradle_project(p_preset, p_debug, p_path, (use_gradle_project_build == 3));
+			return err;
+		}
+
 		if (use_custom_build) {
-			//re-generate build.gradle and AndroidManifest.xml
 			{ //test that installed build version is alright
 				FileAccessRef f = FileAccess::open("res://android/.build_version", FileAccess::READ);
 				if (!f) {
@@ -2444,7 +2665,6 @@ public:
 					return ERR_UNCONFIGURED;
 				}
 			}
-
 			// TODO: should we use "package/name" or "application/config/name"?
 			String project_name = get_project_name(p_preset->get("package/name"));
 			// instead of calling _fix_resources
@@ -2452,16 +2672,14 @@ public:
 			if (err != OK) {
 				EditorNode::add_io_error("Unable to overwrite res://android/build/res/*.xml files with project name");
 			}
-			// Copies the project icon files into the appropriate Gradle project directory
+			// Copies the project icon files into the appropriate Gradle project directory.
 			_copy_icons_to_gradle_project(p_preset, main_image, foreground, background);
-
+			// Write an AndroidManifest.xml file into the Gradle project directory.
+			_write_tmp_manifest(p_preset, p_give_internet, p_debug);
 			//build project if custom build is enabled
 			String sdk_path = EDITOR_GET("export/android/custom_build_sdk_path");
-
 			ERR_FAIL_COND_V_MSG(sdk_path == "", ERR_UNCONFIGURED, "Android SDK path must be configured in Editor Settings at 'export/android/custom_build_sdk_path'.");
-
 			_update_custom_build_project();
-
 			OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
 
 			String build_command;
@@ -2476,6 +2694,8 @@ public:
 			build_command = build_path.plus_file(build_command);
 
 			String package_name = get_package_name(p_preset->get("package/unique_name"));
+			String version_code = itos(p_preset->get("version/code"));
+			String version_name = p_preset->get("version/name");
 
 			Vector<PluginConfig> enabled_plugins = get_enabled_plugins(p_preset);
 			String local_plugins_binaries = get_plugins_binaries(BINARY_TYPE_LOCAL, enabled_plugins);
@@ -2489,6 +2709,8 @@ public:
 			}
 			cmdline.push_back("build");
 			cmdline.push_back("-Pexport_package_name=" + package_name); // argument to specify the package name.
+			cmdline.push_back("-Pversion_code=" + version_code); // argument to specify the version code.
+			cmdline.push_back("-Pversion_name=" + version_name); // argument to specify the version name.
 			cmdline.push_back("-Pplugins_local_binaries=" + local_plugins_binaries); // argument to specify the list of plugins local dependencies.
 			cmdline.push_back("-Pplugins_remote_binaries=" + remote_plugins_binaries); // argument to specify the list of plugins remote dependencies.
 			cmdline.push_back("-Pplugins_maven_repos=" + custom_maven_repos); // argument to specify the list of custom maven repos for the plugins dependencies.
@@ -2610,12 +2832,10 @@ public:
 			unzCloseCurrentFile(pkg);
 
 			//write
-
-			if (file == "AndroidManifest.xml") {
-				_fix_manifest(p_preset, data, p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG));
-			}
-
 			if (!use_custom_build) {
+				if (file == "AndroidManifest.xml") {
+					_fix_manifest(p_preset, data, p_give_internet);
+				}
 				if (file == "resources.arsc") {
 					_fix_resources(p_preset, data);
 				}
