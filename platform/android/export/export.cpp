@@ -2499,6 +2499,11 @@ public:
 	}
 
 	Error setup_gradle_project(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, int p_flags = 0) {
+		Ref<Image> main_image;
+		Ref<Image> foreground;
+		Ref<Image> background;
+		load_icon_refs(p_preset, main_image, foreground, background);
+
 		//re-generate build.gradle and AndroidManifest.xml
 		{ //test that installed build version is alright
 			FileAccessRef f = FileAccess::open("res://android/.build_version", FileAccess::READ);
@@ -2526,7 +2531,7 @@ public:
 			EditorNode::add_io_error("Unable to overwrite res://android/build/res/*.xml files with project name");
 		}
 		// Copy project icons into the Gradle project
-		_copy_icons_to_gradle_project(p_preset);
+		_copy_icons_to_gradle_project(p_preset, main_image, foreground, background);
 		bool p_give_internet = p_flags & (DEBUG_FLAG_DUMB_CLIENT | DEBUG_FLAG_REMOTE_DEBUG);
 		_write_tmp_manifest(p_preset, p_give_internet, p_debug);
 		_update_custom_build_project();
