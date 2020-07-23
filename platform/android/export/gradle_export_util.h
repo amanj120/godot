@@ -142,4 +142,28 @@ Error _create_project_name_strings_files(const Ref<EditorExportPreset> &p_preset
 	return OK;
 }
 
+String bool_to_string(bool v) {
+	return v ? "true" : "false";
+}
+
+String _get_gles_tag() {
+	bool min_gles3 = ProjectSettings::get_singleton()->get("rendering/quality/driver/driver_name") == "GLES3" &&
+					 !ProjectSettings::get_singleton()->get("rendering/quality/driver/fallback_to_gles2");
+	return min_gles3 ? "    <uses-feature android:glEsVersion=\"0x00030000\" android:required=\"true\" />\n" : "";
+}
+
+String _get_screen_sizes_tag(const Ref<EditorExportPreset> &p_preset) {
+	String manifest_screen_sizes = "    <supports-screens \n        tools:node=\"replace\"";
+	String sizes[] = { "small", "normal", "large", "xlarge" };
+	size_t num_sizes = sizeof(sizes) / sizeof(sizes[0]);
+	for (size_t i = 0; i < num_sizes; i++) {
+		String feature_name = vformat("screen/support_%s", sizes[i]);
+		String feature_support = bool_to_string(p_preset->get(feature_name));
+		String xml_entry = vformat("\n        android:%sScreens=\"%s\"", sizes[i], feature_support);
+		manifest_screen_sizes += xml_entry;
+	}
+	manifest_screen_sizes += " />\n";
+	return manifest_screen_sizes;
+}
+
 #endif //GODOT_GRADLE_EXPORT_UTIL_H
