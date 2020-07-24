@@ -2051,12 +2051,11 @@ public:
 			}
 		}
 
-		if (bool(p_preset->get("custom_template/export_app_bundle"))) {
-			if (!bool(p_preset->get("custom_template/use_custom_build"))) {
-				valid = false;
-				err += TTR("\"Export App Bundle\" is only valid when \"Use Custom Build\" is enabled.");
-				err += "\n";
-			}
+		if (bool(p_preset->get("custom_template/export_app_bundle")) &&
+				!bool(p_preset->get("custom_template/use_custom_build"))) {
+			valid = false;
+			err += TTR("\"Export App Bundle\" is only valid when \"Use Custom Build\" is enabled.");
+			err += "\n";
 		}
 
 		r_error = err;
@@ -2067,7 +2066,6 @@ public:
 		List<String> list;
 		list.push_back("apk");
 		list.push_back("aab");
-		//TODO: make sure "aab" is selected only when "export_app_bundle" is selected.
 		return list;
 	}
 
@@ -2467,6 +2465,15 @@ public:
 
 		load_icon_refs(p_preset, main_image, foreground, background);
 
+		if (export_app_bundle && p_path.find(".aab") == -1) {
+			EditorNode::get_singleton()->show_warning(TTR("Cannot export App Bundle using a *.apk file name."));
+			return ERR_UNCONFIGURED;
+		}
+		if (!export_app_bundle && p_path.find(".aab") != -1) {
+			EditorNode::get_singleton()->show_warning(TTR("Cannot export APK using a *.aab file name."));
+			return ERR_UNCONFIGURED;
+		}
+
 		if (use_custom_build) {
 			//re-generate build.gradle and AndroidManifest.xml
 			{ //test that installed build version is alright
@@ -2542,7 +2549,7 @@ public:
 			}
 
 			if (export_app_bundle) {
-				String build_type = (p_debug ? "Debug" : "Release");
+				String build_type = p_debug ? "Debug" : "Release";
 				String build_command = vformat("bundle%s", build_type);
 				cmdline.push_back(build_command);
 			} else {
@@ -2572,12 +2579,8 @@ public:
 
 			if (export_app_bundle) {
 				List<String> copy_args;
-				String output_path;
-				if (p_debug) {
-					output_path = "android/build/build/outputs/bundle/debug/build_debug.aab";
-				} else {
-					output_path = "android/build/build/outputs/bundle/release/build_release.aab";
-				}
+				String variant = p_debug ? "debug/build-debug" : "release/build-release";
+				String output_path = vformat("android/build/build/outputs/bundle/%s.aab", variant);
 
 				copy_args.push_back(ProjectSettings::get_singleton()->get_resource_path().plus_file(output_path));
 				copy_args.push_back(p_path.replace(".apk", ".aab"));
