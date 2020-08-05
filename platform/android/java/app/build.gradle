@@ -86,6 +86,9 @@ android {
         targetCompatibility 1.8
     }
 
+//ASSET_PACK_INFO_START !!!DO NOT EDIT THIS LINE!!!
+//ASSET_PACK_INFO_END !!!DO NOT EDIT THIS LINE!!!
+
     defaultConfig {
         // The default ignore pattern for the 'assets' directory includes hidden files and directories which are used by Godot projects.
         aaptOptions {

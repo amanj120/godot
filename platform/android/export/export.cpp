@@ -1592,6 +1592,33 @@ public:
 		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "custom_template/release", PROPERTY_HINT_GLOBAL_FILE, "*.apk"), ""));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "custom_template/use_custom_build"), false));
 		r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "custom_template/export_format", PROPERTY_HINT_ENUM, "Export APK,Export AAB"), 0));
+		r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "custom_template/asset_pack_config_file", PROPERTY_HINT_FILE, "*.cfg"), ""));
+
+		/*
+		 * The asset pack config file has to follow a VERY specific format:
+		 *
+		 * Asset pack entires are written in groups of three lines.
+		 * The first line is the path to the folder that should be an asset pack:
+		 *     For example: if the folder that you want to make into an asset pack is res://sprites/,
+		 *     then Line 1 should be "sprites/". Note that the line ends with the '/' character
+		 * The second line is an integer value corresponding to the asset pack delivery mode
+		 *     '0' for Install-Time
+		 *     '1' for Fast-Follow
+		 *     '2' for On-Demand
+		 * The third line is the name of the asset pack. Use only alphanumeric charcters and the '_'
+		 *     character.
+		 *
+		 * DO NOT INCLUDE A NEWLINE AT THE END OF THE FILE!
+		 *
+		 * An example file might look like this:
+		 *
+		 * testpack/
+		 * 0
+		 * TestPack
+		 *
+		 * Three lines, no newline at the end of the file, no quotation marks
+		 * The number of lines in the file MUST be a multiple of three.
+		 */
 
 		Vector<PluginConfig> plugins_configs = get_plugins();
 		for (int i = 0; i < plugins_configs.size(); i++) {
@@ -2613,6 +2640,13 @@ public:
 			_write_tmp_manifest(p_preset, p_give_internet, p_debug);
 			_update_custom_build_project();
 			//stores all the project files inside the Gradle project directory. Also includes all ABIs
+			/*
+			 * The call to `delete_asset_folders() deletes all the files and directories that aren't
+			 * part of the original gradle project that gets downloaded when you select "Install Android Build Template"
+			 * in the editor
+			 */
+			delete_asset_folders();
+
 			if (!apk_expansion) {
 				DirAccess *da_res = DirAccess::create(DirAccess::ACCESS_RESOURCES);
 				if (da_res->dir_exists("res://android/build/assets")) {
@@ -2633,6 +2667,18 @@ public:
 				}
 			}
 			store_file_at_path("res://android/build/assets/_cl_", command_line_flags);
+			String asset_pack_config_file = p_preset->get("custom_template/asset_pack_config_file");
+			if (asset_pack_config_file.length() != 0) {
+				/*
+				 * The call to `_handle_asset_packs()` takes care of creating the Asset Pack gradle modules,
+				 * as well as modifying the root project's build.gradle and settings.gradle files.
+				 */
+				err = _handle_asset_packs(asset_pack_config_file);
+			}
+			if (err != OK) {
+				EditorNode::add_io_error("Could not set up Asset Packs\n");
+				return err;
+			}
 
 			OS::get_singleton()->set_environment("ANDROID_HOME", sdk_path); //set and overwrite if required
 			String build_command;
